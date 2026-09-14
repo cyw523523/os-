@@ -1,14 +1,51 @@
-/*
- * lab1 初始骨架代码(自动生成): 系统启动与串口控制台输出。
- * 启动至此的前期初始化流程，需要由你在本实验中设计并实现。
- * 你需要实现: entry.S(start 前的 M 态准备可另置 start.c)、串口轮询输出、
- * 最小 printf。链接脚本 kernel.ld 带注释保留; 底层宏 riscv.h 完整保留。
- * 代码导读路线与设计引导问题详见《实验说明书(lab1)》。
- *
- * 两个环境注意事项(说明书 §2"环境前置条件"与附录 C, 动手前必读):
- *  1. start() 的 M→S 切换清单必须包含 PMP 配置(最简两行):
- *       w_pmpaddr0(0x3fffffffffffffull); w_pmpcfg0(0xf);
- *     否则在新版 QEMU 上 mret 进 S 态的第一条取指即触发 fault(全程无输出)。
- *  2. entry.S 里的陷阱向量标号前加 .balign 4(mtvec 要求 4 字节对齐,
- *     不满足时写入会被硬件静默丢弃)。
- */
+#include "course_sid.h"
+#include "types.h"
+
+void bannerputs(const char *);
+void bannerputc(int);
+void bannernewline(void);
+
+static void
+banner_number(uint64 value)
+{
+  char buf[32];
+  int i = 0;
+
+  do {
+    buf[i++] = '0' + value % 10;
+    value /= 10;
+  } while (value != 0);
+
+  while (i > 0)
+    bannerputc(buf[--i]);
+}
+
+static void
+banner_hex(uint64 value)
+{
+  static const char digits[] = "0123456789abcdef";
+  char buf[16];
+  int i = 0;
+
+  do {
+    buf[i++] = digits[value & 0xf];
+    value >>= 4;
+  } while (value != 0);
+
+  bannerputs("0x");
+  while (i > 0)
+    bannerputc(buf[--i]);
+}
+
+void
+main(void)
+{
+  bannerputs("OSLAB1 sid=");
+  banner_number(COURSE_SID);
+  bannerputs(" mod97=");
+  banner_hex(COURSE_SID % 97);
+  bannernewline();
+
+  for (;;)
+    asm volatile("wfi");
+}
