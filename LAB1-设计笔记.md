@@ -230,4 +230,6 @@ qemu-system-riscv64 -machine virt -bios none \
 - UART 卡死：检查 UART 基址、LSR 偏移和 THRE bit；
 - 输出格式错误：检查协议是否每个字符后都追加 `.`，最后是否确实以 `.` 结束。
 
-# 
+## 8. 输出结果
+
+![](C:\Users\cyw\AppData\Roaming\marktext\images\2026-09-21-15-26-53-image.png)
