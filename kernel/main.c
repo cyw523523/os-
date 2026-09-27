@@ -4,6 +4,10 @@
 void bannerputs(const char *);
 void bannerputc(int);
 void bannernewline(void);
+void consoleputc(int);
+void consoleinit(void);
+void procinit(void);
+void userinit(void) __attribute__((noreturn));
 
 static void
 banner_number(uint64 value)
@@ -45,7 +49,8 @@ main(void)
   bannerputs(" mod97=");
   banner_hex(COURSE_SID % 97);
   bannernewline();
-
-  for (;;)
-    asm volatile("wfi");
+  consoleputc('\n');
+  consoleinit();
+  procinit();
+  userinit();
 }

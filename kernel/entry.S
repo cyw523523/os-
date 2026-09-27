@@ -30,4 +30,5 @@ machine_trap:
 .balign 16
 stack0:
   .space LAB1_STACK_KB * 1024
+.globl stack0_top
 stack0_top:
