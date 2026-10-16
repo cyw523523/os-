@@ -2,7 +2,8 @@
 #define PROC_H
 
 #define NPROC 4
-#define USER_MEM_SIZE (128 * 1024)
+#define USER_MEM_SIZE KERNBASE
+#define USER_STACK_BASE (USER_MEM_SIZE - 4 * PGSIZE)
 
 struct trapframe {
   uint64 kernel_satp, kernel_sp, kernel_trap, epc, kernel_hartid;
@@ -20,9 +21,9 @@ struct proc {
   struct proc *parent;
   int exit_status;
   uint64 image_size;
+  uint64 size;
   pagetable_t pagetable;
   struct trapframe *trapframe;
-  uchar *memory;
 };
 
 extern struct proc *current_proc;
@@ -34,9 +35,21 @@ int proc_fork(void);
 int proc_exec(const char *name);
 int proc_wait(uint64 status_addr);
 void proc_exit(int status) __attribute__((noreturn));
-void *useraddr(struct proc *p, uint64 va, uint64 len);
-
 pagetable_t proc_pagetable(struct proc *p);
+void proc_freepagetable(pagetable_t root);
 uint64 proc_satp(struct proc *p);
+void kinit(void);
+void kvminit(void);
+uint64 kernel_satp(void);
+void *kalloc(void);
+void kfree(void *address);
+uint64 kpages_used(void);
+int uvmalloc(pagetable_t root, uint64 start, uint64 end, int flags);
+void uvmdealloc(pagetable_t root, uint64 start, uint64 end);
+int uvmcopy(pagetable_t source, pagetable_t target, uint64 start, uint64 end);
+int usercopy(pagetable_t root, uint64 va, void *buffer, uint64 count, int to_user);
+int usercheck(pagetable_t root, uint64 va, uint64 count, int write);
+void dump_pagetable(pagetable_t root);
+uint64 proc_sbrk(int amount);
 
 #endif

@@ -7,6 +7,8 @@ void bannernewline(void);
 void consoleputc(int);
 void consoleinit(void);
 void procinit(void);
+void kinit(void);
+void kvminit(void);
 void userinit(void) __attribute__((noreturn));
 
 static void
@@ -51,6 +53,8 @@ main(void)
   bannernewline();
   consoleputc('\n');
   consoleinit();
+  kinit();
+  kvminit();
   procinit();
   userinit();
 }

@@ -5,6 +5,7 @@
 
 void syscall(void);
 void consoleintr(void);
+void printf(const char *, ...);
 extern char kernelvec[];
 
 static int
@@ -28,8 +29,11 @@ kerneltrap(void)
   uint64 sstatus = r_sstatus();
   uint64 cause = r_scause();
 
-  if (!devintr(cause))
-    proc_exit(-1);
+  if (!devintr(cause)) {
+    printf("kernel trap cause=%p epc=%p tval=%p\n",
+           cause, sepc, r_stval());
+    for (;;) asm volatile("wfi");
+  }
 
   w_sepc(sepc);
   w_sstatus(sstatus);

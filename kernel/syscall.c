@@ -5,6 +5,7 @@
 
 void consoleputc(int c);
 int consolegetc(void);
+void dump_pagetable(pagetable_t root);
 
 static uint64
 argraw(int n)
@@ -22,11 +23,14 @@ static int
 sys_write(void)
 {
   uint64 va = argraw(1), n = argraw(2);
-  char *p = useraddr(current_proc, va, n);
-  if (p == 0)
+  if (n > 65536 || usercheck(current_proc->pagetable, va, n, 0) < 0)
     return -1;
-  for (uint64 i = 0; i < n; i++)
-    consoleputc(p[i]);
+  for (uint64 i = 0; i < n; i++) {
+    char value;
+    if (usercopy(current_proc->pagetable, va + i, &value, 1, 0) < 0)
+      return -1;
+    consoleputc(value);
+  }
   return n;
 }
 
@@ -34,17 +38,22 @@ static int
 sys_read(void)
 {
   uint64 va = argraw(1), n = argraw(2);
-  char *p = useraddr(current_proc, va, n);
-  if (p == 0)
+  if (n > 65536 || usercheck(current_proc->pagetable, va, n, 1) < 0)
     return -1;
   intr_on();
   for (uint64 i = 0; i < n; i++) {
     int c;
     while ((c = consolegetc()) < 0)
       asm volatile("wfi");
+    if (c == 0x10) {
+      dump_pagetable(current_proc->pagetable);
+      continue;
+    }
     if (c == '\r')
       c = '\n';
-    p[i] = c;
+    char value = c;
+    if (usercopy(current_proc->pagetable, va + i, &value, 1, 1) < 0)
+      return intr_off(), -1;
     consoleputc(c);
     if (c == '\n')
       return intr_off(), i + 1;
@@ -56,9 +65,21 @@ sys_read(void)
 static int
 sys_exec(void)
 {
-  char *name = useraddr(current_proc, argraw(0), 1);
-  if (name == 0)
+  char name[32];
+  uint64 address = argraw(0);
+  if (address >= MAXVA || sizeof(name) > MAXVA - address)
     return -1;
+  int index;
+  for (index = 0; index < sizeof(name) - 1; index++) {
+    if (usercopy(current_proc->pagetable, address + index,
+                 &name[index], 1, 0) < 0)
+      return -1;
+    if (name[index] == 0 || name[index] == '\n')
+      break;
+  }
+  if (index == sizeof(name) - 1)
+    return -1;
+  name[index + 1] = 0;
   return proc_exec(name);
 }
 
@@ -76,6 +97,8 @@ syscall(void)
   case SYS_getpid: ret = current_proc->pid; break;
   case SYS_write: ret = sys_write(); break;
   case SYS_close: ret = 0; break;
+  case SYS_sbrk: ret = proc_sbrk((int)argraw(0)); break;
+  case SYS_pagecount: ret = kpages_used(); break;
   default: ret = -1; break;
   }
   current_proc->trapframe->a0 = ret;

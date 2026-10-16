@@ -6,7 +6,7 @@ CFLAGS = -Wall -Werror -O -std=gnu99 -mcmodel=medany -ffreestanding \
 QEMU = qemu-system-riscv64
 OBJCOPY ?= riscv64-unknown-elf-objcopy
 
-UPROGS = sh hi spin badecall bufstorm
+UPROGS = sh hi spin badecall bufstorm badaccess memcap noop vmstress
 UFLAGS = -Wall -Werror -O -std=gnu99 -mcmodel=medany -ffreestanding \
          -nostdlib -fno-common -ggdb -march=rv64gc \
          -fno-stack-protector -fno-pie -I.
@@ -21,19 +21,40 @@ kernel/kernel: $(OBJS) kernel/kernel.ld
 user/usys.S: user/usys.pl
 	perl user/usys.pl > user/usys.S
 
-user-flat/%.bin: user/%.c user/user.h user/ulib.c user/printf.c user/usys.S
+user-flat/ulib.o: user/ulib.c user/user.h
 	mkdir -p user-flat
-	$(CC) $(UFLAGS) -Iuser -c user/ulib.c -o user-flat/ulib.o
-	$(CC) $(UFLAGS) -Iuser -c user/printf.c -o user-flat/printf.o
-	$(CC) $(UFLAGS) -Iuser -c user/usys.S -o user-flat/usys.o
+	$(CC) $(UFLAGS) -Iuser -c $< -o $@
+
+user-flat/printf.o: user/printf.c user/user.h
+	mkdir -p user-flat
+	$(CC) $(UFLAGS) -Iuser -c $< -o $@
+
+user-flat/usys.o: user/usys.S
+	mkdir -p user-flat
+	$(CC) $(UFLAGS) -Iuser -c $< -o $@
+
+user-flat/%.bin: user/%.c user/user.h user-flat/ulib.o user-flat/printf.o user-flat/usys.o
+	mkdir -p user-flat
 	$(CC) $(UFLAGS) -Iuser -c $< -o user-flat/$*.o
-	$(LD) -T user/user.ld -o user-flat/$*.elf user-flat/$*.o user-flat/ulib.o user-flat/printf.o user-flat/usys.o
+	$(LD) -T user/user.ld -Ttext 0x1000 -o user-flat/$*.elf user-flat/$*.o user-flat/ulib.o user-flat/printf.o user-flat/usys.o
 	$(OBJCOPY) -O binary user-flat/$*.elf $@
 
 user/badecall.c: support/tests/badecall.c
 	cp $< $@
 
 user/bufstorm.c: support/tests/bufstorm.c
+	cp $< $@
+
+user/badaccess.c: support/tests/badaccess.c
+	cp $< $@
+
+user/memcap.c: support/tests/memcap.c
+	cp $< $@
+
+user/noop.c: support/tests/noop.c
+	cp $< $@
+
+user/vmstress.c: support/tests/vmstress.c
 	cp $< $@
 
 kernel/userimg.S: Makefile $(addprefix user-flat/,$(UPROGS:=.bin))

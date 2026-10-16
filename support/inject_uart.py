@@ -24,9 +24,7 @@ import time
 QEMU = "qemu-system-riscv64"
 QEMU_ARGS = ["-machine", "virt", "-bios", "none", "-kernel", "kernel/kernel",
              "-m", "128M", "-smp", "1", "-nographic",
-             "-global", "virtio-mmio.force-legacy=false",
-             "-drive", "file=fs.img,if=none,format=raw,id=x0",
-             "-device", "virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0"]
+             "-global", "virtio-mmio.force-legacy=false"]
 
 
 def main():
@@ -39,7 +37,11 @@ def main():
     with open(args.script) as f:
         cmds = [l.strip() for l in f if l.strip() and not l.startswith("#")]
 
-    proc = subprocess.Popen([QEMU] + QEMU_ARGS, cwd=args.tree,
+    qemu_args = QEMU_ARGS.copy()
+    if os.path.isfile(os.path.join(args.tree, "fs.img")):
+        qemu_args += ["-drive", "file=fs.img,if=none,format=raw,id=x0",
+                      "-device", "virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0"]
+    proc = subprocess.Popen([QEMU] + qemu_args, cwd=args.tree,
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, bufsize=0)
     sel = selectors.DefaultSelector()
@@ -58,10 +60,10 @@ def main():
 
     def wait_prompt(timeout=10):
         t0 = time.time()
-        while "$ " not in buf and time.time() - t0 < timeout:
+        while "sh> " not in buf and "$ " not in buf and time.time() - t0 < timeout:
             drain()
             time.sleep(0.1)
-        return "$ " in buf
+        return "sh> " in buf or "$ " in buf
 
     ok = wait_prompt()
     print(f"boot {'ok' if ok else 'TIMEOUT'}")

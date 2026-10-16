@@ -1,0 +1,9 @@
+SEND bufstorm
+WAIT 200
+SEND one
+SEND two
+SEND three
+SEND four
+EXPECT BUFSTORM lines=4
+SEND hi
+EXPECT hi: user program running
