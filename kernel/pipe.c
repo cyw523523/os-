@@ -76,7 +76,11 @@ pipeclose(int fd)
   current_proc->fdmode[fd] = 0;
   wakeup(&q->nread);
   wakeup(&q->nwrite);
-  if (!q->readers && !q->writers) q->used = 0;
+  if (!q->readers && !q->writers) {
+    acquire(&table_lock);
+    q->used = 0;
+    release_lock(&table_lock);
+  }
   release_lock(&q->lock);
   return 0;
 }

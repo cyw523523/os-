@@ -19,9 +19,9 @@ devintr(uint64 cause)
     return 2;
   }
   if (cause == 0x8000000000000009ULL) {
-    uint32 irq = *(volatile uint32 *)PLIC_SCLAIM(0);
+    uint32 irq = *(volatile uint32 *)PLIC_SCLAIM(r_tp());
     if (irq == UART0_IRQ) consoleintr();
-    if (irq) *(volatile uint32 *)PLIC_SCLAIM(0) = irq;
+    if (irq) *(volatile uint32 *)PLIC_SCLAIM(r_tp()) = irq;
     return 1;
   }
   return 0;
@@ -49,7 +49,7 @@ usertrapret(void)
   p->trapframe->kernel_satp = kernel_satp();
   p->trapframe->kernel_sp = (uint64)p->kstack + PGSIZE;
   p->trapframe->kernel_trap = (uint64)usertrap;
-  p->trapframe->kernel_hartid = 0;
+  p->trapframe->kernel_hartid = r_tp();
   uint64 status = r_sstatus();
   status &= ~SSTATUS_SPP;
   status |= SSTATUS_SPIE;

@@ -1,0 +1,20 @@
+EXPECT DUMP-PAGETABLE begin
+EXPECT DUMP-PAGETABLE end
+SEND smpstress
+EXPECT SMPSTRESS PASS: workers=6 forks=300
+SEND smpstress
+EXPECT SMPSTRESS PASS: workers=6 forks=300
+SEND smpstress
+EXPECT SMPSTRESS PASS: workers=6 forks=300
+SEND smpstress
+EXPECT SMPSTRESS PASS: workers=6 forks=300
+SEND smpstress
+EXPECT SMPSTRESS PASS: workers=6 forks=300
+SEND bench
+EXPECT RESULT avg_ctx_switch = [0-9]+
+EXPECT PASS: bench
+SEND lottery_test
+EXPECT RESULT lottery_ratio = [0-9]+:[0-9]+
+EXPECT PASS: lottery
+SEND vmstress
+EXPECT VMSTRESS PASS

@@ -8,6 +8,7 @@ OBJCOPY ?= riscv64-unknown-elf-objcopy
 
 UPROGS = sh hi spin badecall bufstorm badaccess memcap noop vmstress
 UPROGS += bench lottery_test stride_test
+UPROGS += smpstress
 UFLAGS = -Wall -Werror -O -std=gnu99 -mcmodel=medany -ffreestanding \
          -nostdlib -fno-common -ggdb -march=rv64gc \
          -fno-stack-protector -fno-pie -I. -DSID=2024302111375

@@ -1,36 +1,32 @@
 #include "types.h"
 #include "riscv.h"
-#include "spinlock.h"
-
-// Lab4's required baseline is one hart. Disabling local interrupts makes
-// lock transitions atomic with traps and the scheduler on that hart.
-static int noff;
-static int intena;
+#include "proc.h"
 
 void
 acquire(struct spinlock *lock)
 {
+  struct cpu *c = &cpus[r_tp()];
   int enabled = intr_get();
   intr_off();
-  if (noff++ == 0)
-    intena = enabled;
-  if (lock->locked)
+  if (c->noff++ == 0) c->intena = enabled;
+  if (lock->locked && lock->owner == (int)r_tp())
     for (;;) asm volatile("wfi");
-  lock->locked = 1;
+  while (__sync_lock_test_and_set(&lock->locked, 1))
+    ;
+  __sync_synchronize();
+  lock->owner = r_tp();
 }
 
 void
 release_lock(struct spinlock *lock)
 {
-  if (!lock->locked)
+  struct cpu *c = &cpus[r_tp()];
+  if (!lock->locked || lock->owner != (int)r_tp() || c->noff < 1)
     for (;;) asm volatile("wfi");
-  lock->locked = 0;
-  if (--noff == 0 && intena)
-    intr_on();
+  lock->owner = -1;
+  __sync_synchronize();
+  __sync_lock_release(&lock->locked);
+  if (--c->noff == 0 && c->intena) intr_on();
 }
 
-int
-lock_depth(void)
-{
-  return noff;
-}
+int lock_depth(void) { return cpus[r_tp()].noff; }

@@ -22,6 +22,20 @@ struct context {
   uint64 s[12];
 };
 
+struct proc;
+struct cpu {
+  struct proc *proc;
+  struct context scheduler;
+  int noff;
+  int intena;
+  uint64 random_state;
+};
+
+#define LAB4_NCPU 2
+extern struct cpu cpus[LAB4_NCPU];
+struct proc *myproc(void);
+#define current_proc myproc()
+
 struct pipe;
 
 struct proc {
@@ -45,8 +59,6 @@ struct proc {
   struct pipe *pipes[16];
   uchar fdmode[16];
 };
-
-extern struct proc *current_proc;
 
 void procinit(void);
 void userinit(void);

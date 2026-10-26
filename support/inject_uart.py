@@ -3,7 +3,8 @@
 inject_uart.py — 向运行中的系统自动输入预定义串口内容(lab2 压力测试驱动)
 
 用法:
-  python3 inject_uart.py --tree <内核树> --script storm.txt [--log out.txt]
+  python3 inject_uart.py --tree <内核树> --script storm.txt
+      [--log out.txt] [--cpus 1|2]
 
 脚本文件指令(每行一条):
   SEND hello          向串口发送一行文本(自动带回车)
@@ -32,12 +33,14 @@ def main():
     ap.add_argument("--tree", required=True)
     ap.add_argument("--script", required=True)
     ap.add_argument("--log", default="inject_uart.log")
+    ap.add_argument("--cpus", type=int, choices=(1, 2), default=1)
     args = ap.parse_args()
 
     with open(args.script) as f:
         cmds = [l.strip() for l in f if l.strip() and not l.startswith("#")]
 
     qemu_args = QEMU_ARGS.copy()
+    qemu_args[qemu_args.index("-smp") + 1] = str(args.cpus)
     if os.path.isfile(os.path.join(args.tree, "fs.img")):
         qemu_args += ["-drive", "file=fs.img,if=none,format=raw,id=x0",
                       "-device", "virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0"]
@@ -68,6 +71,7 @@ def main():
     ok = wait_prompt()
     print(f"boot {'ok' if ok else 'TIMEOUT'}")
     failures = 0
+    expect_pos = 0
     for line in cmds:
         parts = line.split(None, 1)
         op = parts[0].upper()
@@ -92,7 +96,9 @@ def main():
             hit = False
             while time.time() - t0 < 10:
                 drain()
-                if re.search(arg, buf, re.M):
+                match = re.search(arg, buf[expect_pos:], re.M)
+                if match:
+                    expect_pos += match.end()
                     hit = True
                     break
                 time.sleep(0.1)

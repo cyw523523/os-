@@ -19,11 +19,15 @@ static uint64 first_page;
 static uint64 allocated_count;
 static uint64 page_limit;
 static pagetable_t kernel_table;
+static struct spinlock kmem_lock;
 
 uint64
 kpages_used(void)
 {
-  return allocated_count;
+  acquire(&kmem_lock);
+  uint64 count = allocated_count;
+  release_lock(&kmem_lock);
+  return count;
 }
 
 static uint64
@@ -61,8 +65,11 @@ kinit(void)
 void *
 kalloc(void)
 {
-  if (free_top == 0 || allocated_count >= page_limit)
+  acquire(&kmem_lock);
+  if (free_top == 0 || allocated_count >= page_limit) {
+    release_lock(&kmem_lock);
     return 0;
+  }
   uint64 group = highest_bit(free_top);
   uint64 word = group * 64 + highest_bit(free_groups[group]);
   uint64 index = word * 64 + highest_bit(free_pages[word]);
@@ -74,6 +81,7 @@ kalloc(void)
   }
   allocated_count++;
   void *address = (void *)(KERNBASE + index * PGSIZE);
+  release_lock(&kmem_lock);
   zero(address, PGSIZE);
   return address;
 }
@@ -85,16 +93,20 @@ kfree(void *address)
   if (page < first_page || page >= PHYSTOP ||
       (page & (PGSIZE - 1)) != 0)
     return;
+  acquire(&kmem_lock);
   uint64 index = (page - KERNBASE) / PGSIZE;
   uint64 word = index / 64;
   uint64 group = word / 64;
   uint64 mask = 1ULL << (index % 64);
-  if (free_pages[word] & mask)
+  if (free_pages[word] & mask) {
+    release_lock(&kmem_lock);
     return;
+  }
   free_pages[word] |= mask;
   free_groups[group] |= 1ULL << (word % 64);
   free_top |= 1ULL << group;
   allocated_count--;
+  release_lock(&kmem_lock);
 }
 
 static pte_t *

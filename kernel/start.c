@@ -32,6 +32,7 @@ start(void)
   sfence_vma();
 
   w_sie(r_sie() | SIE_SEIE | SIE_STIE);
+  w_tp(r_mhartid());
 
   asm volatile("mret");
   for (;;)

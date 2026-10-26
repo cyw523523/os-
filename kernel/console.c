@@ -11,6 +11,7 @@
 #define UART_LSR_DR 0x01
 
 static uint64 banner_bytes;
+static struct spinlock output_lock;
 static struct {
   struct spinlock lock;
   uchar data[LAB2_BUF_SIZE];
@@ -29,6 +30,14 @@ consoleinit(void)
   *(volatile uint32 *)(PLIC_PRIORITY + UART0_IRQ * 4) = 1;
   *(volatile uint32 *)PLIC_SENABLE(0) |= 1U << UART0_IRQ;
   *(volatile uint32 *)PLIC_SPRIORITY(0) = 0;
+  io_fence();
+}
+
+void
+consoleinithart(void)
+{
+  *(volatile uint32 *)PLIC_SENABLE(r_tp()) |= 1U << UART0_IRQ;
+  *(volatile uint32 *)PLIC_SPRIORITY(r_tp()) = 0;
   io_fence();
 }
 
@@ -56,7 +65,9 @@ throttle(void)
 void
 consoleputc(int c)
 {
+  acquire(&output_lock);
   uartputc_sync(c);
+  release_lock(&output_lock);
 }
 
 int

@@ -1,5 +1,6 @@
 #include "course_sid.h"
 #include "types.h"
+#include "riscv.h"
 
 void bannerputs(const char *);
 void bannerputc(int);
@@ -12,6 +13,10 @@ void kvminit(void);
 void userinit(void);
 void scheduler(void) __attribute__((noreturn));
 void timerinit(void);
+void consoleinithart(void);
+uint64 kernel_satp(void);
+extern char kernelvec[];
+static int boot_ready;
 
 static void
 banner_number(uint64 value)
@@ -48,6 +53,16 @@ banner_hex(uint64 value)
 void
 main(void)
 {
+  if (r_tp() != 0) {
+    while (!__atomic_load_n(&boot_ready, __ATOMIC_ACQUIRE))
+      asm volatile("nop");
+    w_satp(kernel_satp());
+    sfence_vma();
+    w_stvec((uint64)kernelvec);
+    consoleinithart();
+    timerinit();
+    scheduler();
+  }
   bannerputs("OSLAB1 sid=");
   banner_number(COURSE_SID);
   bannerputs(" mod97=");
@@ -58,7 +73,9 @@ main(void)
   kinit();
   kvminit();
   procinit();
+  w_stvec((uint64)kernelvec);
   timerinit();
   userinit();
+  __atomic_store_n(&boot_ready, 1, __ATOMIC_RELEASE);
   scheduler();
 }

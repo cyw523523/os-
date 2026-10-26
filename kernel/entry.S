@@ -11,11 +11,15 @@ _entry:
   la t0, machine_trap
   csrw mtvec, t0
 
-  # Lab1 is a single-core baseline. Park every non-boot hart.
+  # Two harts use separate boot/scheduler stacks.
   csrr t0, mhartid
-  bnez t0, park
+  li t1, 2
+  bgeu t0, t1, park
 
   la sp, stack0_top
+  li t1, LAB1_STACK_KB * 1024
+  mul t0, t0, t1
+  sub sp, sp, t0
   call start
 
 park:
@@ -29,6 +33,6 @@ machine_trap:
 .section .bss.stack
 .balign 16
 stack0:
-  .space LAB1_STACK_KB * 1024
+  .space 2 * LAB1_STACK_KB * 1024
 .globl stack0_top
 stack0_top:

@@ -10,12 +10,13 @@ void usertrapret(void) __attribute__((noreturn));
 void swtch(struct context *, struct context *);
 
 static struct proc procs[NPROC];
-struct proc *current_proc;
+struct cpu cpus[LAB4_NCPU];
 static struct proc *initproc;
-static struct context sched_context;
 static struct spinlock wait_lock, ticks_lock;
-static uint64 ticks, random_state = COURSE_SID;
+static uint64 ticks;
 static int nextpid = 1;
+
+struct proc *myproc(void) { return cpus[r_tp()].proc; }
 
 static void
 copy_name(char dst[8], const char *src)
@@ -67,7 +68,7 @@ allocproc(void)
       continue;
     }
     p->state = USED;
-    p->pid = nextpid++;
+    p->pid = __sync_fetch_and_add(&nextpid, 1);
     p->parent = 0;
     p->size = p->image_size = 0;
     p->killed = p->exit_status = 0;
@@ -137,6 +138,8 @@ void
 procinit(void)
 {
   for (int i = 0; i < NPROC; i++) procs[i].state = UNUSED;
+  for (int i = 0; i < LAB4_NCPU; i++)
+    cpus[i].random_state = COURSE_SID ^ (0x9e3779b97f4a7c15ULL * (i + 1));
 }
 
 void
@@ -157,16 +160,17 @@ sched(void)
   if (!current_proc || lock_depth() != 1 || intr_get() ||
       current_proc->state == RUNNING)
     for (;;) asm volatile("wfi");
-  swtch(&current_proc->context, &sched_context);
+  swtch(&current_proc->context, &cpus[r_tp()].scheduler);
 }
 
 static uint64
 random64(void)
 {
-  random_state ^= random_state << 13;
-  random_state ^= random_state >> 7;
-  random_state ^= random_state << 17;
-  return random_state * 0x2545F4914F6CDD1DULL;
+  struct cpu *c = &cpus[r_tp()];
+  c->random_state ^= c->random_state << 13;
+  c->random_state ^= c->random_state >> 7;
+  c->random_state ^= c->random_state << 17;
+  return c->random_state * 0x2545F4914F6CDD1DULL;
 }
 
 void
@@ -174,13 +178,31 @@ scheduler(void)
 {
   for (;;) {
     intr_on();
-    // One hart: both scans are atomic while local interrupts are disabled.
+    // Each candidate is locked again before RUNNING is set; two harts cannot
+    // dispatch the same process even if the runnable set changes mid-scan.
     intr_off();
-    int total = 0;
+    int max_tickets = 0, leader_ticks = 0;
     for (int i = 0; i < NPROC; i++) {
       acquire(&procs[i].lock);
-      if (procs[i].state == RUNNABLE) total += procs[i].tickets;
+      if (procs[i].state == RUNNABLE || procs[i].state == RUNNING) {
+        if (procs[i].tickets > max_tickets) {
+          max_tickets = procs[i].tickets;
+          leader_ticks = procs[i].cpu_ticks;
+        } else if (procs[i].tickets == max_tickets &&
+                   procs[i].cpu_ticks > leader_ticks)
+          leader_ticks = procs[i].cpu_ticks;
+      }
       release_lock(&procs[i].lock);
+    }
+    int total = 0;
+    for (int i = 0; i < NPROC; i++) {
+      struct proc *p = &procs[i];
+      acquire(&p->lock);
+      if (p->state == RUNNABLE &&
+          (uint64)p->cpu_ticks * max_tickets <=
+            (uint64)leader_ticks * p->tickets + 2ULL * max_tickets)
+        total += p->tickets;
+      release_lock(&p->lock);
     }
     if (!total) {
       intr_on();
@@ -191,13 +213,15 @@ scheduler(void)
     for (int i = 0; i < NPROC; i++) {
       struct proc *p = &procs[i];
       acquire(&p->lock);
-      if (p->state == RUNNABLE) {
+      if (p->state == RUNNABLE &&
+          (uint64)p->cpu_ticks * max_tickets <=
+            (uint64)leader_ticks * p->tickets + 2ULL * max_tickets) {
         if (draw < p->tickets) {
           p->state = RUNNING;
           p->last_slice_ticks = 0;
-          current_proc = p;
-          swtch(&sched_context, &p->context);
-          current_proc = 0;
+          cpus[r_tp()].proc = p;
+          swtch(&cpus[r_tp()].scheduler, &p->context);
+          cpus[r_tp()].proc = 0;
           release_lock(&p->lock);
           break;
         }
@@ -247,13 +271,20 @@ wakeup(void *chan)
 void
 proc_tick(void)
 {
-  acquire(&ticks_lock);
-  ticks++;
-  wakeup(&ticks);
-  release_lock(&ticks_lock);
-  if (current_proc && current_proc->state == RUNNING) {
-    current_proc->cpu_ticks++;
-    current_proc->last_slice_ticks++;
+  if (r_tp() == 0) {
+    acquire(&ticks_lock);
+    ticks++;
+    wakeup(&ticks);
+    release_lock(&ticks_lock);
+  }
+  struct proc *p = current_proc;
+  if (p) {
+    acquire(&p->lock);
+    if (p->state == RUNNING) {
+      p->cpu_ticks++;
+      p->last_slice_ticks++;
+    }
+    release_lock(&p->lock);
   }
 }
 
@@ -379,13 +410,11 @@ proc_exit(int status)
       wakeup(initproc);
     }
   }
+  if (p->parent) wakeup(p->parent);
   acquire(&p->lock);
   p->exit_status = status;
   p->state = ZOMBIE;
-  release_lock(&p->lock);
-  if (p->parent) wakeup(p->parent);
   release_lock(&wait_lock);
-  acquire(&p->lock);
   sched();
   for (;;) asm volatile("wfi");
 }

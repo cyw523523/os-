@@ -1,6 +1,6 @@
 # Lab4 设计与复现
 
-学号 2024302111375，`LAB4_POLICY_ID=5`，单核彩票调度。课程包中的 `gifts/` 与 `support/tests/` 原件留存；构建使用的测试副本在 `user/`。
+学号 2024302111375，`LAB4_POLICY_ID=5`，彩票调度；单核必做与双核加分路径均已实现。课程包中的 `gifts/` 与 `support/tests/` 原件留存；构建使用的测试副本在 `user/`。
 
 ## 控制流与状态
 
@@ -33,7 +33,7 @@ UNUSED → USED → RUNNABLE → RUNNING → RUNNABLE   (时钟片用尽/yield)
 3. `sleep(chan, lock)` 先持进程锁再释放条件锁，设置 SLEEPING 后切换；唤醒者持进程锁修改状态，避免检查条件与睡眠之间丢失唤醒。
 4. ZOMBIE 的内核栈、trapframe 和页表在父进程 `wait` 回收前始终存活。
 5. 只有 RUNNABLE 参与抽签；票数范围为 1–1000，因此每个持续就绪进程都有正概率。
-6. 单核下扫描与抽签期间关闭中断，状态和票数不会被本核中断异步改写。此锁实现只面向必做的 `-smp 1`，没有承诺双核安全。
+6. 每核扫描候选时关闭本核中断；双核间以进程锁保护状态、票数及统计。选中候选后须再次持锁确认 RUNNABLE，才可改为 RUNNING，防止两个核重复派发同一进程。
 
 `kill` 只设置标志并将睡眠进程变为就绪，让其在可安全检查的边界退出；直接从别的执行栈释放睡眠进程会破坏其内核栈和锁状态。调度器无就绪进程时打开中断并执行 `wfi`，否则时钟及 UART 无法唤醒进程。
 
@@ -52,4 +52,25 @@ python3 support/inject_uart.py --tree . --script support/tests/lab3-uart.script 
 python3 support/inject_uart.py --tree . --script support/tests/lab2-uart-regression.script --log /tmp/lab4-lab2.log
 ```
 
-验收目标是 `RESULT avg_ctx_switch`、`RESULT lottery_ratio`、`PASS: bench`、`PASS: lottery`、`VMSTRESS PASS`，以及 Lab3 页表 dump 和早期回归。脚本也运行 `stride_test` 作为额外的比例与活性检查；它并不能证明彩票策略具备步长策略的确定性有界公平性。多核挑战为选做，当前引导代码将非零 hart 停放。
+验收目标是 `RESULT avg_ctx_switch`、`RESULT lottery_ratio`、`PASS: bench`、`PASS: lottery`、`VMSTRESS PASS`，以及 Lab3 页表 dump 和早期回归。脚本也运行 `stride_test` 作为额外的比例与活性检查；它并不能证明彩票策略具备步长策略的确定性有界公平性。
+
+## 双核加分实现
+
+`entry.S` 为 hart 0/1 分配独立的引导与调度器栈；hart 0 初始化内核页表、内存、进程及设备后发布启动标志，hart 1 再加载共享内核页表、配置本核 PLIC/时钟并进入调度循环。每核保存独立的当前进程、调度器 context、中断嵌套深度和随机数状态；trapframe 记录进程最近运行的 hart，使用户态陷入后仍在正确 CPU 上恢复。
+
+自旋锁使用 RISC-V 原子交换，进入临界区前禁用本核中断。物理页位图、进程状态、管道引用计数及串口输入均有相应锁保护。退出进程持有自身进程锁跨过 `swtch`，直到调度器恢复并释放，父进程才可回收其内核栈。锁顺序主要为条件锁 → 进程锁；物理页锁只保护位图/计数，不在其内获取进程锁。
+
+两个 CPU 同时运行两个持续就绪进程时，单纯在 RUNNABLE 集合抽签会让两个进程各占一个核，CPU 份额退化为 1:1。双核调度因而读取运行及就绪进程的累计 tick，以最高票数进程为参照，暂时跳过超过目标比例两个 tick 的候选。高票进程可持续占一核，低票进程按票数比间歇运行另一核；在 `60:30` 测试中观测到约 `294:150`。这会为维护份额有意留下部分空闲 CPU 容量，属于本策略在进程数少于核数时的取舍。
+
+双核复现：
+
+```sh
+make -j4
+python3 support/inject_uart.py --tree . --cpus 2 --script support/tests/lab4-smp-uart.script --log /tmp/lab4-smp.log
+python3 support/inject_uart.py --tree . --cpus 2 --script support/tests/lab3-uart.script --log /tmp/lab4-smp-lab3.log
+python3 support/inject_uart.py --tree . --cpus 2 --script support/tests/lab2-uart-regression.script --log /tmp/lab4-smp-lab2.log
+```
+
+`smpstress` 同时启动 6 个工作进程，每轮 300 次 `fork/exec/wait`，通过共享管道回传完成标记，并比较前后物理页数。双核脚本连续运行五轮该负载，再运行 `bench`、彩票测试和 `vmstress`。QEMU `-d int` 的一次 `bench` 追踪显示 hart 0/1 分别处理了 411/460 次用户 `ecall`，表明两个 hart 均实际执行了用户进程。
+
+在三次独立双核启动中，每次五轮压力测试、`bench`、彩票测试及 `vmstress` 均通过，日志没有 `FAIL`、panic 或 kernel trap；Lab2/Lab3 双核回归及 Lab4 单核回归也通过。这些是有限压力测试结果，不能代替形式化并发证明或教师现场验收。
