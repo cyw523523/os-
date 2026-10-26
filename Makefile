@@ -7,13 +7,16 @@ QEMU = qemu-system-riscv64
 OBJCOPY ?= riscv64-unknown-elf-objcopy
 
 UPROGS = sh hi spin badecall bufstorm badaccess memcap noop vmstress
+UPROGS += bench lottery_test stride_test
 UFLAGS = -Wall -Werror -O -std=gnu99 -mcmodel=medany -ffreestanding \
          -nostdlib -fno-common -ggdb -march=rv64gc \
-         -fno-stack-protector -fno-pie -I.
+         -fno-stack-protector -fno-pie -I. -DSID=2024302111375
 
 OBJS = kernel/entry.o kernel/start.o kernel/console.o kernel/printf.o kernel/main.o \
        kernel/vm.o kernel/proc.o kernel/trap.o kernel/syscall.o \
-       kernel/kernelvec.o kernel/trampoline.o kernel/userimg.o
+       kernel/kernelvec.o kernel/trampoline.o kernel/swtch.o kernel/spinlock.o \
+       kernel/pipe.o kernel/userimg.o
+LIBGCC = $(shell $(CC) -print-libgcc-file-name)
 
 kernel/kernel: $(OBJS) kernel/kernel.ld
 	$(LD) -T kernel/kernel.ld -o $@ $(OBJS)
@@ -33,10 +36,14 @@ user-flat/usys.o: user/usys.S
 	mkdir -p user-flat
 	$(CC) $(UFLAGS) -Iuser -c $< -o $@
 
-user-flat/%.bin: user/%.c user/user.h user-flat/ulib.o user-flat/printf.o user-flat/usys.o
+user-flat/common.o: user/common.c user/common.h user/user.h
+	mkdir -p user-flat
+	$(CC) $(UFLAGS) -Iuser -c $< -o $@
+
+user-flat/%.bin: user/%.c user/user.h user-flat/ulib.o user-flat/printf.o user-flat/usys.o user-flat/common.o
 	mkdir -p user-flat
 	$(CC) $(UFLAGS) -Iuser -c $< -o user-flat/$*.o
-	$(LD) -T user/user.ld -Ttext 0x1000 -o user-flat/$*.elf user-flat/$*.o user-flat/ulib.o user-flat/printf.o user-flat/usys.o
+	$(LD) -T user/user.ld -Ttext 0x1000 -o user-flat/$*.elf user-flat/$*.o user-flat/ulib.o user-flat/printf.o user-flat/usys.o user-flat/common.o $(LIBGCC)
 	$(OBJCOPY) -O binary user-flat/$*.elf $@
 
 user/badecall.c: support/tests/badecall.c

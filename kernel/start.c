@@ -23,6 +23,10 @@ start(void)
   w_pmpaddr0(0x3fffffffffffffull);
   w_pmpcfg0(0xf);
 
+  // Sstc: delegate the supervisor timer comparator to S mode.
+  w_menvcfg(r_menvcfg() | MENVCFG_STCE);
+  w_mcounteren(r_mcounteren() | 2);
+
   // Lab1 has no page tables yet: use physical addresses directly.
   w_satp(0);
   sfence_vma();

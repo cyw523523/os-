@@ -1,7 +1,9 @@
 #ifndef PROC_H
 #define PROC_H
 
-#define NPROC 4
+#include "spinlock.h"
+
+#define NPROC 16
 #define USER_MEM_SIZE KERNBASE
 #define USER_STACK_BASE (USER_MEM_SIZE - 4 * PGSIZE)
 
@@ -13,9 +15,17 @@ struct trapframe {
   uint64 t3, t4, t5, t6;
 };
 
-enum procstate { UNUSED, RUNNABLE, RUNNING, WAITING, ZOMBIE };
+enum procstate { UNUSED, USED, RUNNABLE, RUNNING, SLEEPING, ZOMBIE };
+
+struct context {
+  uint64 ra, sp;
+  uint64 s[12];
+};
+
+struct pipe;
 
 struct proc {
+  struct spinlock lock;
   int pid;
   enum procstate state;
   struct proc *parent;
@@ -24,13 +34,38 @@ struct proc {
   uint64 size;
   pagetable_t pagetable;
   struct trapframe *trapframe;
+  struct context context;
+  void *kstack;
+  void *chan;
+  int killed;
+  int tickets;
+  int cpu_ticks;
+  int last_slice_ticks;
+  char name[8];
+  struct pipe *pipes[16];
+  uchar fdmode[16];
 };
 
 extern struct proc *current_proc;
 
 void procinit(void);
-void userinit(void) __attribute__((noreturn));
-void switch_to(struct proc *p) __attribute__((noreturn));
+void userinit(void);
+void scheduler(void) __attribute__((noreturn));
+void yield(void);
+void sleep(void *chan, struct spinlock *lock);
+void wakeup(void *chan);
+void proc_tick(void);
+int proc_kill(int pid);
+int proc_schedstat(int pid, uint64 cpu_addr, uint64 slice_addr);
+int proc_setickets(int tickets);
+uint64 proc_ticks(void);
+void proc_pause(int count);
+int pipealloc(uint64 user_fds);
+int piperead(int fd, uint64 address, int count);
+int pipewrite(int fd, uint64 address, int count);
+int pipeclose(int fd);
+void pipefork(struct proc *parent, struct proc *child);
+void pipeexit(struct proc *p);
 int proc_fork(void);
 int proc_exec(const char *name);
 int proc_wait(uint64 status_addr);

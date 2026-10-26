@@ -5,7 +5,7 @@ static long
 pagecount(void)
 {
   register long result asm("a0");
-  register long number asm("a7") = 23;
+  register long number asm("a7") = 26;
   asm volatile("ecall" : "=r"(result) : "r"(number) : "memory");
   return result;
 }

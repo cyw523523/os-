@@ -9,7 +9,9 @@ void consoleinit(void);
 void procinit(void);
 void kinit(void);
 void kvminit(void);
-void userinit(void) __attribute__((noreturn));
+void userinit(void);
+void scheduler(void) __attribute__((noreturn));
+void timerinit(void);
 
 static void
 banner_number(uint64 value)
@@ -56,5 +58,7 @@ main(void)
   kinit();
   kvminit();
   procinit();
+  timerinit();
   userinit();
+  scheduler();
 }

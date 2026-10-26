@@ -2,6 +2,7 @@
 #include "riscv.h"
 #include "course_sid.h"
 #include "memlayout.h"
+#include "proc.h"
 
 #define UART_THR 0
 #define UART_IER 1
@@ -11,6 +12,7 @@
 
 static uint64 banner_bytes;
 static struct {
+  struct spinlock lock;
   uchar data[LAB2_BUF_SIZE];
   uint64 read;
   uint64 write;
@@ -60,21 +62,36 @@ consoleputc(int c)
 int
 consolegetc(void)
 {
+  acquire(&input.lock);
   if (input.read == input.write)
-    return -1;
-  return input.data[input.read++ % LAB2_BUF_SIZE];
+    return release_lock(&input.lock), -1;
+  int c = input.data[input.read++ % LAB2_BUF_SIZE];
+  release_lock(&input.lock);
+  return c;
+}
+
+void
+consolewait(void)
+{
+  acquire(&input.lock);
+  while (input.read == input.write && !current_proc->killed)
+    sleep(&input, &input.lock);
+  release_lock(&input.lock);
 }
 
 void
 consoleintr(void)
 {
   volatile uchar *uart = (volatile uchar *)UART0;
+  acquire(&input.lock);
 
   while (uart[UART_LSR] & UART_LSR_DR) {
     int c = uart[UART_THR];
     if (input.write - input.read < LAB2_BUF_SIZE)
       input.data[input.write++ % LAB2_BUF_SIZE] = c;
   }
+  wakeup(&input);
+  release_lock(&input.lock);
 }
 
 void

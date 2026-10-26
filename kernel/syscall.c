@@ -5,6 +5,7 @@
 
 void consoleputc(int c);
 int consolegetc(void);
+void consolewait(void);
 void dump_pagetable(pagetable_t root);
 
 static uint64
@@ -23,6 +24,9 @@ static int
 sys_write(void)
 {
   uint64 va = argraw(1), n = argraw(2);
+  int fd = (int)argraw(0);
+  if (fd >= 3) return pipewrite(fd, va, (int)n);
+  if (fd != 1 && fd != 2) return -1;
   if (n > 65536 || usercheck(current_proc->pagetable, va, n, 0) < 0)
     return -1;
   for (uint64 i = 0; i < n; i++) {
@@ -38,13 +42,16 @@ static int
 sys_read(void)
 {
   uint64 va = argraw(1), n = argraw(2);
+  int fd = (int)argraw(0);
+  if (fd >= 3) return piperead(fd, va, (int)n);
+  if (fd != 0) return -1;
   if (n > 65536 || usercheck(current_proc->pagetable, va, n, 1) < 0)
     return -1;
-  intr_on();
   for (uint64 i = 0; i < n; i++) {
     int c;
-    while ((c = consolegetc()) < 0)
-      asm volatile("wfi");
+    while ((c = consolegetc()) < 0 && !current_proc->killed)
+      consolewait();
+    if (current_proc->killed) return -1;
     if (c == 0x10) {
       dump_pagetable(current_proc->pagetable);
       continue;
@@ -53,12 +60,11 @@ sys_read(void)
       c = '\n';
     char value = c;
     if (usercopy(current_proc->pagetable, va + i, &value, 1, 1) < 0)
-      return intr_off(), -1;
+      return -1;
     consoleputc(c);
     if (c == '\n')
-      return intr_off(), i + 1;
+      return i + 1;
   }
-  intr_off();
   return n;
 }
 
@@ -96,7 +102,14 @@ syscall(void)
   case SYS_exec: ret = sys_exec(); break;
   case SYS_getpid: ret = current_proc->pid; break;
   case SYS_write: ret = sys_write(); break;
-  case SYS_close: ret = 0; break;
+  case SYS_close: ret = argraw(0) < 3 ? 0 : pipeclose((int)argraw(0)); break;
+  case SYS_pipe: ret = pipealloc(argraw(0)); break;
+  case SYS_kill: ret = proc_kill((int)argraw(0)); break;
+  case SYS_pause: proc_pause((int)argraw(0)); ret = 0; break;
+  case SYS_uptime: ret = proc_ticks(); break;
+  case SYS_schedstat: ret = proc_schedstat((int)argraw(0), argraw(1), argraw(2)); break;
+  case SYS_time_rdtime: ret = r_time(); break;
+  case SYS_setickets: ret = proc_setickets((int)argraw(0)); break;
   case SYS_sbrk: ret = proc_sbrk((int)argraw(0)); break;
   case SYS_pagecount: ret = kpages_used(); break;
   default: ret = -1; break;
