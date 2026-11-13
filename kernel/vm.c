@@ -20,6 +20,18 @@ static uint64 allocated_count;
 static uint64 page_limit;
 static pagetable_t kernel_table;
 static struct spinlock kmem_lock;
+static uint references[MAX_PHYSICAL_PAGES];
+static uchar cow_origin[MAX_PHYSICAL_PAGES];
+static uint64 copies, shared_pages;
+
+uint64
+pmc_read(int which)
+{
+  acquire(&kmem_lock);
+  uint64 value = which == 0 ? copies : which == 1 ? shared_pages : (uint64)-1;
+  release_lock(&kmem_lock);
+  return value;
+}
 
 uint64
 kpages_used(void)
@@ -80,6 +92,8 @@ kalloc(void)
       free_top &= ~(1ULL << group);
   }
   allocated_count++;
+  references[index] = 1;
+  cow_origin[index] = 0;
   void *address = (void *)(KERNBASE + index * PGSIZE);
   release_lock(&kmem_lock);
   zero(address, PGSIZE);
@@ -98,10 +112,14 @@ kfree(void *address)
   uint64 word = index / 64;
   uint64 group = word / 64;
   uint64 mask = 1ULL << (index % 64);
-  if (free_pages[word] & mask) {
+  if (!references[index] || (free_pages[word] & mask)) {
     release_lock(&kmem_lock);
-    return;
+    printf("panic: physical page double free %p\n", page);
+    for (;;) asm volatile("wfi");
   }
+  if (cow_origin[index] && references[index] == 2) shared_pages--;
+  if (--references[index]) { release_lock(&kmem_lock); return; }
+  cow_origin[index] = 0;
   free_pages[word] |= mask;
   free_groups[group] |= 1ULL << (word % 64);
   free_top |= 1ULL << group;
@@ -296,17 +314,72 @@ uvmcopy(pagetable_t source, pagetable_t target, uint64 start, uint64 end)
     pte_t *pte = walk(source, va, 0);
     if (pte == 0 || !(*pte & PTE_V) || !(*pte & PTE_U))
       continue;
-    void *page = kalloc();
-    if (page == 0)
-      return -1;
-    uchar *from = (uchar *)PTE2PA(*pte);
-    uchar *to = page;
-    for (int index = 0; index < PGSIZE; index++)
-      to[index] = from[index];
-    if (map(target, va, (uint64)page, PGSIZE, PTE_FLAGS(*pte) & ~PTE_V) < 0) {
-      kfree(page);
+    uint64 physical = PTE2PA(*pte);
+    uint64 index = (physical - KERNBASE) / PGSIZE;
+    int flags = PTE_FLAGS(*pte);
+    if (flags & PTE_W) flags = (flags & ~PTE_W) | PTE_COW;
+    acquire(&kmem_lock);
+    int was_shared = cow_origin[index] && references[index] > 1;
+    references[index]++;
+    if (flags & PTE_COW) cow_origin[index] = 1;
+    if (!was_shared && cow_origin[index] && references[index] > 1)
+      shared_pages++;
+    release_lock(&kmem_lock);
+    *pte = PA2PTE(physical) | flags;
+    if (map(target, va, physical, PGSIZE, flags & ~PTE_V) < 0) {
+      kfree((void *)physical);
+      sfence_vma();
       return -1;
     }
+  }
+  // Parent may still have writable translations cached from before fork.
+  sfence_vma();
+  return 0;
+}
+
+int
+cow_resolve(pagetable_t root, uint64 va)
+{
+  pte_t *pte = walk(root, va, 0);
+  if (!pte || (*pte & (PTE_V | PTE_U | PTE_COW)) !=
+                       (PTE_V | PTE_U | PTE_COW) || (*pte & PTE_W)) return -1;
+  struct proc *p = current_proc;
+  if (p && __atomic_load_n(&p->killed, __ATOMIC_ACQUIRE)) return -1;
+  uint64 physical = PTE2PA(*pte);
+  uint64 index = (physical - KERNBASE) / PGSIZE;
+  int flags = (PTE_FLAGS(*pte) | PTE_W) & ~PTE_COW;
+  acquire(&kmem_lock);
+  if (references[index] == 1) {
+    *pte = PA2PTE(physical) | flags;
+    release_lock(&kmem_lock);
+    sfence_vma();
+    return 0;
+  }
+  release_lock(&kmem_lock);
+  // Our mapping retains its reference until the complete new page is published.
+  // Other harts can drop references, but cannot free/reuse this source page.
+  uchar *page = kalloc();
+  if (!page) return -1;
+  for (int i = 0; i < PGSIZE; i++) page[i] = ((uchar *)physical)[i];
+  if (LAB5_KILL_SEMANTICS == 0 && p &&
+      __atomic_load_n(&p->killed, __ATOMIC_ACQUIRE)) {
+    // The actual copy still happened, even though the mapping is not committed.
+    acquire(&kmem_lock);
+    copies++;
+    release_lock(&kmem_lock);
+    kfree(page);
+    return -1;
+  }
+  *pte = PA2PTE(page) | flags;
+  sfence_vma();
+  kfree((void *)physical);
+  acquire(&kmem_lock);
+  copies++;
+  release_lock(&kmem_lock);
+  if (p && ++p->cow_copies > LAB5_COW_BUDGET && !p->cow_budget_reported) {
+    p->cow_budget_reported = 1;
+    printf("COW-BUDGET pid=%d limit=%d: report and continue safely\n",
+           p->pid, LAB5_COW_BUDGET);
   }
   return 0;
 }
@@ -316,7 +389,7 @@ userpa(pagetable_t root, uint64 va, int write)
 {
   pte_t *pte = walk(root, va, 0);
   if (pte == 0 || !(*pte & PTE_V) || !(*pte & PTE_U) ||
-      !(*pte & (write ? PTE_W : PTE_R)))
+      !(*pte & (write ? (PTE_W | PTE_COW) : PTE_R)))
     return 0;
   return PTE2PA(*pte) + (va & (PGSIZE - 1));
 }
@@ -348,6 +421,11 @@ usercopy(pagetable_t root, uint64 va, void *buffer, uint64 count, int to_user)
     return -1;
   uchar *bytes = buffer;
   for (uint64 offset = 0; offset < count;) {
+    if (to_user) {
+      pte_t *pte = walk(root, va + offset, 0);
+      if (pte && (*pte & PTE_COW) && cow_resolve(root, va + offset) < 0)
+        return -1;
+    }
     uint64 physical = userpa(root, va + offset, to_user);
     if (physical == 0)
       return -1;
@@ -363,6 +441,34 @@ usercopy(pagetable_t root, uint64 va, void *buffer, uint64 count, int to_user)
     offset += chunk;
   }
   return 0;
+}
+
+// Only for a newly allocated, unpublished ELF image (not syscall copyout).
+int
+uvmload(pagetable_t root, uint64 va, const void *src, uint64 count)
+{
+  const uchar *bytes = src;
+  for (uint64 offset = 0; offset < count;) {
+    uint64 physical = userpa(root, va + offset, 0);
+    if (!physical) return -1;
+    uint64 chunk = PGSIZE - ((va + offset) & (PGSIZE - 1));
+    if (chunk > count - offset) chunk = count - offset;
+    for (uint64 i = 0; i < chunk; i++)
+      ((uchar *)physical)[i] = bytes[offset + i];
+    offset += chunk;
+  }
+  return 0;
+}
+
+int
+userstring(pagetable_t root, uint64 va, char *dst, uint64 limit)
+{
+  for (uint64 i = 0; i < limit; i++) {
+    if (va >= MAXVA || i >= MAXVA - va ||
+        usercopy(root, va + i, dst + i, 1, 0) < 0) return -1;
+    if (!dst[i]) return i;
+  }
+  return -1;
 }
 
 uint64

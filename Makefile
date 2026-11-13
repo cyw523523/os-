@@ -9,6 +9,10 @@ OBJCOPY ?= riscv64-unknown-elf-objcopy
 UPROGS = sh hi spin badecall bufstorm badaccess memcap noop vmstress
 UPROGS += bench lottery_test stride_test
 UPROGS += smpstress
+UPROGS += zerocopy cowpair
+UPROGS += argcheck exectest cowstress cowoom
+UPROGS += zeroraw
+UPROGS += init
 UFLAGS = -Wall -Werror -O -std=gnu99 -mcmodel=medany -ffreestanding \
          -nostdlib -fno-common -ggdb -march=rv64gc \
          -fno-stack-protector -fno-pie -I. -DSID=2024302111375
@@ -33,7 +37,7 @@ user-flat/printf.o: user/printf.c user/user.h
 	mkdir -p user-flat
 	$(CC) $(UFLAGS) -Iuser -c $< -o $@
 
-user-flat/usys.o: user/usys.S
+user-flat/usys.o: user/usys.S kernel/syscall.h
 	mkdir -p user-flat
 	$(CC) $(UFLAGS) -Iuser -c $< -o $@
 
@@ -41,11 +45,16 @@ user-flat/common.o: user/common.c user/common.h user/user.h
 	mkdir -p user-flat
 	$(CC) $(UFLAGS) -Iuser -c $< -o $@
 
-user-flat/%.bin: user/%.c user/user.h user-flat/ulib.o user-flat/printf.o user-flat/usys.o user-flat/common.o
+user-flat/%.elf: user/%.c user/user.h user/lab5test.h kernel/lab5.h kernel/syscall.h support/user-lab5.ld user-flat/ulib.o user-flat/printf.o user-flat/usys.o user-flat/common.o
 	mkdir -p user-flat
 	$(CC) $(UFLAGS) -Iuser -c $< -o user-flat/$*.o
-	$(LD) -T user/user.ld -Ttext 0x1000 -o user-flat/$*.elf user-flat/$*.o user-flat/ulib.o user-flat/printf.o user-flat/usys.o user-flat/common.o $(LIBGCC)
-	$(OBJCOPY) -O binary user-flat/$*.elf $@
+	$(LD) -T support/user-lab5.ld -o $@ user-flat/$*.o user-flat/ulib.o user-flat/printf.o user-flat/usys.o user-flat/common.o $(LIBGCC)
+
+user/zerocopy.c: support/tests/zerocopy.c
+	cp $< $@
+
+user/cowpair.c: support/tests/cowpair.c
+	cp $< $@
 
 user/badecall.c: support/tests/badecall.c
 	cp $< $@
@@ -65,11 +74,11 @@ user/noop.c: support/tests/noop.c
 user/vmstress.c: support/tests/vmstress.c
 	cp $< $@
 
-kernel/userimg.S: Makefile $(addprefix user-flat/,$(UPROGS:=.bin))
+kernel/userimg.S: Makefile $(addprefix user-flat/,$(UPROGS:=.elf))
 	printf '.section .rodata\n .global _uprog_table\n_uprog_table:\n' > $@.tmp
 	for p in $(UPROGS); do \
 		printf ' .quad _uprog_%s_start\n .quad _uprog_%s_end\n .asciz "%s"\n .balign 8\n' $$p $$p $$p >> $@.tmp; \
-		printf ' .global _uprog_%s_start\n_uprog_%s_start:\n .incbin "user-flat/%s.bin"\n .global _uprog_%s_end\n_uprog_%s_end:\n .balign 8\n' $$p $$p $$p $$p $$p >> $@.tmp; \
+		printf ' .global _uprog_%s_start\n_uprog_%s_start:\n .incbin "user-flat/%s.elf"\n .global _uprog_%s_end\n_uprog_%s_end:\n .balign 8\n' $$p $$p $$p $$p $$p >> $@.tmp; \
 	done
 	printf ' .quad 0\n .quad 0\n' >> $@.tmp
 	mv $@.tmp $@
@@ -85,7 +94,7 @@ kernel/trampoline.o: kernel/trampoline.S
 	$(OBJCOPY) --rename-section trampsec=.text.trampoline,alloc,load,readonly,code,contents $@.tmp $@
 	rm -f $@.tmp
 
-%.o: %.c kernel/riscv.h kernel/course_sid.h
+%.o: %.c kernel/riscv.h kernel/course_sid.h kernel/proc.h kernel/lab5.h kernel/syscall.h
 	$(CC) $(CFLAGS) -Ikernel -c -o $@ $<
 
 %.o: %.S

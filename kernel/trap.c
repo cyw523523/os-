@@ -55,6 +55,8 @@ usertrapret(void)
   status |= SSTATUS_SPIE;
   w_sstatus(status);
   w_sepc(p->trapframe->epc);
+  // A process can migrate after exec; each hart synchronizes its own I-cache.
+  icache_fence();
   w_stvec(TRAMPOLINE + ((uint64)uservec & (PGSIZE - 1)));
   ((void (*)(uint64))(TRAMPOLINE + ((uint64)userret & (PGSIZE - 1))))
     (proc_satp(p));
@@ -71,10 +73,13 @@ usertrap(void)
   if (cause == 8) {
     current_proc->trapframe->epc += 4;
     syscall();
+  } else if (cause == 15) {
+    if (cow_resolve(current_proc->pagetable, r_stval()) < 0) proc_exit(-1);
+    // Retry the faulting store; epc must not advance as it does for ecall.
   } else if (!which) {
     proc_exit(-1);
   }
-  if (current_proc->killed) proc_exit(-1);
+  if (__atomic_load_n(&current_proc->killed, __ATOMIC_ACQUIRE)) proc_exit(-1);
   if (which == 2 && current_proc->state == RUNNING &&
       current_proc->last_slice_ticks >= LAB2_TICK)
     yield();

@@ -1,0 +1,652 @@
+Lab5 UART validation evidence
+Each section is a complete QEMU UART log from a successful check.
+
+===== cpu1-run1-lab2-uart-regression.script.log sha256=8954c00439746fe4c05efdc5b1450561073c2cb19028b70e01351e53bf4643da =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> bufstorm
+one
+one
+two
+two
+three
+three
+four
+four
+BUFSTORM lines=4 bytes=19
+sh> hi
+hi: user program running, pid=4
+sh> 
+===== cpu1-run1-lab3-uart.script.log sha256=9d033d7d27349c148ad9c3955755250c548b38fa68197b8699539692a9a90a2a =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> hi
+hi: user program running, pid=3
+sh> badecall
+TEST-1 PASS: unknown syscalls all return -1
+sh> badaccess
+TEST-3a PASS: wild write killed (status=-1)
+TEST-3b PASS: beyond-sbrk access killed (status=-1)
+sh> memcap
+TEST-4 PASS: OOM returned error after 2027 chunks; existing alloc intact; kernel alive
+sh> vmstress
+COW-BUDGET pid=9 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu1-run1-lab4-uart.script.log sha256=57ed7f3a0ed7331712033d04f481ad79c5f33c6319b336a5fafbc54a6f9f7cf1 =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> bench
+RESULT avg_ctx_switch = 456
+PASS: bench
+sh> lottery_test
+RESULT lottery_ratio = 252:112
+PASS: lottery
+sh> stride_test
+RESULT stride_ratio = 252:874
+PASS: stride
+sh> vmstress
+COW-BUDGET pid=11 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu1-run1-lab5-uart.script.log sha256=e8ff2e28c693c47de20a08d4454f3b6abca9c8effabb73f54d1ad1eed41c486f =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> zerocopy
+hi: user program running, pid=4
+T5-1 copies: 2 -> 3 (delta 1)
+T5-1 PASS: fork-immediately-exec ~zero copy
+sh> zeroraw
+hi: user program running, pid=6
+LAB5 ZERO PASS: fork-immediate-exec copies=0
+sh> cowpair
+T5-2 copies delta = 2 (expect 2)
+T5-2 PASS: pair-write exact 2 copies, data isolated
+sh> exectest
+LAB5 ARGV PASS: argc=4 strings/null/alignment
+LAB5 EXEC PASS: cross-page argv, empty argv, errors, rollback
+sh> cowstress
+LAB5 SHARING PASS: six writers, isolated data, shared refs restored
+LAB5 COPYOUT PASS: pipe/read/wait/schedstat and nested fork
+LAB5 READONLY PASS: real text cannot become writable
+COW-BUDGET pid=22 limit=143: report and continue safely
+COW-BUDGET pid=23 limit=143: report and continue safely
+COW-BUDGET pid=24 limit=143: report and continue safely
+COW-BUDGET pid=25 limit=143: report and continue safely
+COW-BUDGET pid=26 limit=143: report and continue safely
+COW-BUDGET pid=27 limit=143: report and continue safely
+COW-BUDGET pid=28 limit=143: report and continue safely
+COW-BUDGET pid=29 limit=143: report and continue safely
+COW-BUDGET pid=30 limit=143: report and continue safely
+COW-BUDGET pid=31 limit=143: report and continue safely
+COW-BUDGET pid=32 limit=143: report and continue safely
+COW-BUDGET pid=33 limit=143: report and continue safely
+COW-BUDGET pid=34 limit=143: report and continue safely
+COW-BUDGET pid=35 limit=143: report and continue safely
+COW-BUDGET pid=36 limit=143: report and continue safely
+COW-BUDGET pid=37 limit=143: report and continue safely
+COW-BUDGET pid=38 limit=143: report and continue safely
+COW-BUDGET pid=39 limit=143: report and continue safely
+COW-BUDGET pid=40 limit=143: report and continue safely
+COW-BUDGET pid=41 limit=143: report and continue safely
+COW-BUDGET pid=42 limit=143: report and continue safely
+COW-BUDGET pid=43 limit=143: report and continue safely
+COW-BUDGET pid=44 limit=143: report and continue safely
+COW-BUDGET pid=45 limit=143: report and continue safely
+LAB5 KILL PASS: 24 shared-writer exits
+COW-BUDGET pid=46 limit=143: report and continue safely
+LAB5 BUDGET PASS: >143 copies reported, data intact
+LAB5 ORPHAN PASS: parent exits first, init reaps shared pages
+LAB5 COWSTRESS PASS: pages=49 shared=0
+sh> cowoom
+LAB5 OOM ROLLBACK PASS: partial fork and exec cleanup
+LAB5 OOM FAULT PASS: no allocation, child killed, parent intact
+LAB5 COWOOM PASS: pages=48
+sh> bench
+RESULT avg_ctx_switch = 385
+PASS: bench
+sh> vmstress
+COW-BUDGET pid=69 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu2-run1-lab2-uart-regression.script.log sha256=8954c00439746fe4c05efdc5b1450561073c2cb19028b70e01351e53bf4643da =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> bufstorm
+one
+one
+two
+two
+three
+three
+four
+four
+BUFSTORM lines=4 bytes=19
+sh> hi
+hi: user program running, pid=4
+sh> 
+===== cpu2-run1-lab3-uart.script.log sha256=9d033d7d27349c148ad9c3955755250c548b38fa68197b8699539692a9a90a2a =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> hi
+hi: user program running, pid=3
+sh> badecall
+TEST-1 PASS: unknown syscalls all return -1
+sh> badaccess
+TEST-3a PASS: wild write killed (status=-1)
+TEST-3b PASS: beyond-sbrk access killed (status=-1)
+sh> memcap
+TEST-4 PASS: OOM returned error after 2027 chunks; existing alloc intact; kernel alive
+sh> vmstress
+COW-BUDGET pid=9 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu2-run1-lab4-smp-uart.script.log sha256=a9879d58d006e1275e963938053ea653b4962b87bb17c42fd24a462cdd432db2 =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> bench
+RESULT avg_ctx_switch = 543
+PASS: bench
+sh> lottery_test
+RESULT lottery_ratio = 290:148
+PASS: lottery
+sh> vmstress
+COW-BUDGET pid=1543 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu2-run1-lab5-uart.script.log sha256=2b89830b5fc9dea9e3738e2c823b4c3b5a0198de40a413e9da04033f21096f1a =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> zerocopy
+hi: user program running, pid=4
+T5-1 copies: 2 -> 3 (delta 1)
+T5-1 PASS: fork-immediately-exec ~zero copy
+sh> zeroraw
+hi: user program running, pid=6
+LAB5 ZERO PASS: fork-immediate-exec copies=0
+sh> cowpair
+T5-2 copies delta = 2 (expect 2)
+T5-2 PASS: pair-write exact 2 copies, data isolated
+sh> exectest
+LAB5 ARGV PASS: argc=4 strings/null/alignment
+LAB5 EXEC PASS: cross-page argv, empty argv, errors, rollback
+sh> cowstress
+LAB5 SHARING PASS: six writers, isolated data, shared refs restored
+LAB5 COPYOUT PASS: pipe/read/wait/schedstat and nested fork
+LAB5 READONLY PASS: real text cannot become writable
+COW-BUDGET pid=22 limit=143: report and continue safely
+COW-BUDGET pid=23 limit=143: report and continue safely
+COW-BUDGET pid=24 limit=143: report and continue safely
+COW-BUDGET pid=25 limit=143: report and continue safely
+COW-BUDGET pid=26 limit=143: report and continue safely
+COW-BUDGET pid=27 limit=143: report and continue safely
+COW-BUDGET pid=28 limit=143: report and continue safely
+COW-BUDGET pid=29 limit=143: report and continue safely
+COW-BUDGET pid=30 limit=143: report and continue safely
+COW-BUDGET pid=31 limit=143: report and continue safely
+COW-BUDGET pid=32 limit=143: report and continue safely
+COW-BUDGET pid=33 limit=143: report and continue safely
+COW-BUDGET pid=34 limit=143: report and continue safely
+COW-BUDGET pid=35 limit=143: report and continue safely
+COW-BUDGET pid=36 limit=143: report and continue safely
+COW-BUDGET pid=37 limit=143: report and continue safely
+COW-BUDGET pid=38 limit=143: report and continue safely
+COW-BUDGET pid=39 limit=143: report and continue safely
+COW-BUDGET pid=40 limit=143: report and continue safely
+COW-BUDGET pid=41 limit=143: report and continue safely
+COW-BUDGET pid=42 limit=143: report and continue safely
+COW-BUDGET pid=43 limit=143: report and continue safely
+COW-BUDGET pid=44 limit=143: report and continue safely
+COW-BUDGET pid=45 limit=143: report and continue safely
+LAB5 KILL PASS: 24 shared-writer exits
+COW-BUDGET pid=46 limit=143: report and continue safely
+LAB5 BUDGET PASS: >143 copies reported, data intact
+LAB5 ORPHAN PASS: parent exits first, init reaps shared pages
+LAB5 COWSTRESS PASS: pages=49 shared=0
+sh> cowoom
+LAB5 OOM ROLLBACK PASS: partial fork and exec cleanup
+LAB5 OOM FAULT PASS: no allocation, child killed, parent intact
+LAB5 COWOOM PASS: pages=48
+sh> bench
+RESULT avg_ctx_switch = 443
+PASS: bench
+sh> vmstress
+COW-BUDGET pid=69 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu2-run2-lab2-uart-regression.script.log sha256=8954c00439746fe4c05efdc5b1450561073c2cb19028b70e01351e53bf4643da =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> bufstorm
+one
+one
+two
+two
+three
+three
+four
+four
+BUFSTORM lines=4 bytes=19
+sh> hi
+hi: user program running, pid=4
+sh> 
+===== cpu2-run2-lab3-uart.script.log sha256=9d033d7d27349c148ad9c3955755250c548b38fa68197b8699539692a9a90a2a =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> hi
+hi: user program running, pid=3
+sh> badecall
+TEST-1 PASS: unknown syscalls all return -1
+sh> badaccess
+TEST-3a PASS: wild write killed (status=-1)
+TEST-3b PASS: beyond-sbrk access killed (status=-1)
+sh> memcap
+TEST-4 PASS: OOM returned error after 2027 chunks; existing alloc intact; kernel alive
+sh> vmstress
+COW-BUDGET pid=9 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu2-run2-lab4-smp-uart.script.log sha256=807e2b3bfbbcda748e37acb24cddcc031bad7a7cdcbef95d36ebfadb67b51f24 =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> bench
+RESULT avg_ctx_switch = 373
+PASS: bench
+sh> lottery_test
+RESULT lottery_ratio = 293:150
+PASS: lottery
+sh> vmstress
+COW-BUDGET pid=1543 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu2-run2-lab5-uart.script.log sha256=009fe89203c54b0d65337e6f4cd434e2711e67717ea3a1f6b116019573b393cd =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> zerocopy
+hi: user program running, pid=4
+T5-1 copies: 2 -> 3 (delta 1)
+T5-1 PASS: fork-immediately-exec ~zero copy
+sh> zeroraw
+hi: user program running, pid=6
+LAB5 ZERO PASS: fork-immediate-exec copies=0
+sh> cowpair
+T5-2 copies delta = 2 (expect 2)
+T5-2 PASS: pair-write exact 2 copies, data isolated
+sh> exectest
+LAB5 ARGV PASS: argc=4 strings/null/alignment
+LAB5 EXEC PASS: cross-page argv, empty argv, errors, rollback
+sh> cowstress
+LAB5 SHARING PASS: six writers, isolated data, shared refs restored
+LAB5 COPYOUT PASS: pipe/read/wait/schedstat and nested fork
+LAB5 READONLY PASS: real text cannot become writable
+COW-BUDGET pid=23 limit=143: report and continue safely
+COW-BUDGET pid=25 limit=143: report and continue safely
+COW-BUDGET pid=27 limit=143: report and continue safely
+COW-BUDGET pid=29 limit=143: report and continue safely
+COW-BUDGET pid=31 limit=143: report and continue safely
+COW-BUDGET pid=33 limit=143: report and continue safely
+COW-BUDGET pid=35 limit=143: report and continue safely
+COW-BUDGET pid=37 limit=143: report and continue safely
+COW-BUDGET pid=39 limit=143: report and continue safely
+COW-BUDGET pid=41 limit=143: report and continue safely
+COW-BUDGET pid=43 limit=143: report and continue safely
+COW-BUDGET pid=45 limit=143: report and continue safely
+LAB5 KILL PASS: 24 shared-writer exits
+COW-BUDGET pid=46 limit=143: report and continue safely
+LAB5 BUDGET PASS: >143 copies reported, data intact
+LAB5 ORPHAN PASS: parent exits first, init reaps shared pages
+LAB5 COWSTRESS PASS: pages=49 shared=0
+sh> cowoom
+LAB5 OOM ROLLBACK PASS: partial fork and exec cleanup
+LAB5 OOM FAULT PASS: no allocation, child killed, parent intact
+LAB5 COWOOM PASS: pages=48
+sh> bench
+RESULT avg_ctx_switch = 362
+PASS: bench
+sh> vmstress
+COW-BUDGET pid=69 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu2-run3-lab2-uart-regression.script.log sha256=8954c00439746fe4c05efdc5b1450561073c2cb19028b70e01351e53bf4643da =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> bufstorm
+one
+one
+two
+two
+three
+three
+four
+four
+BUFSTORM lines=4 bytes=19
+sh> hi
+hi: user program running, pid=4
+sh> 
+===== cpu2-run3-lab3-uart.script.log sha256=9d033d7d27349c148ad9c3955755250c548b38fa68197b8699539692a9a90a2a =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> hi
+hi: user program running, pid=3
+sh> badecall
+TEST-1 PASS: unknown syscalls all return -1
+sh> badaccess
+TEST-3a PASS: wild write killed (status=-1)
+TEST-3b PASS: beyond-sbrk access killed (status=-1)
+sh> memcap
+TEST-4 PASS: OOM returned error after 2027 chunks; existing alloc intact; kernel alive
+sh> vmstress
+COW-BUDGET pid=9 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu2-run3-lab4-smp-uart.script.log sha256=3f0176dbde0ece79c554558243c4c32af0da4f7bee67a490613126bbb1e190a7 =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> smpstress
+SMPSTRESS PASS: workers=6 forks=300 pages=48
+sh> bench
+RESULT avg_ctx_switch = 377
+PASS: bench
+sh> lottery_test
+RESULT lottery_ratio = 289:148
+PASS: lottery
+sh> vmstress
+COW-BUDGET pid=1543 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 
+===== cpu2-run3-lab5-uart.script.log sha256=31aac272cdc722a5a2fd2130aba57541ddf2e034cf34059a308ce3d1507073d2 =====
+O.S.L.A.B.1. .s.i.d.=.2.0.2.4.3.0.2.1.1.1.3.7.5. .m.o.d.9.7.=.0.x.4.4.
+DUMP-PAGETABLE begin
+L2 va=0x0 pa=0x87fed000 perm=----
+L1 va=0x0 pa=0x87fec000 perm=----
+LEAF va=0x1000 pa=0x87fee000 perm=r-xu
+LEAF va=0x2000 pa=0x87feb000 perm=r--u
+LEAF va=0x3000 pa=0x87fea000 perm=rw-u
+L2 va=0x40000000 pa=0x87fe8000 perm=----
+L1 va=0x7fe00000 pa=0x87fe7000 perm=----
+LEAF va=0x7fffc000 pa=0x87fe9000 perm=rw-u
+L2 va=0x3fc0000000 pa=0x87ff0000 perm=----
+L1 va=0x3fffe00000 pa=0x87fef000 perm=----
+LEAF va=0x3fffffe000 pa=0x87ff6000 perm=rw--
+LEAF va=0x3ffffff000 pa=0x80002000 perm=r-x-
+DUMP-PAGETABLE end
+sh> zerocopy
+hi: user program running, pid=4
+T5-1 copies: 2 -> 3 (delta 1)
+T5-1 PASS: fork-immediately-exec ~zero copy
+sh> zeroraw
+hi: user program running, pid=6
+LAB5 ZERO PASS: fork-immediate-exec copies=0
+sh> cowpair
+T5-2 copies delta = 2 (expect 2)
+T5-2 PASS: pair-write exact 2 copies, data isolated
+sh> exectest
+LAB5 ARGV PASS: argc=4 strings/null/alignment
+LAB5 EXEC PASS: cross-page argv, empty argv, errors, rollback
+sh> cowstress
+LAB5 SHARING PASS: six writers, isolated data, shared refs restored
+LAB5 COPYOUT PASS: pipe/read/wait/schedstat and nested fork
+LAB5 READONLY PASS: real text cannot become writable
+COW-BUDGET pid=22 limit=143: report and continue safely
+COW-BUDGET pid=23 limit=143: report and continue safely
+COW-BUDGET pid=24 limit=143: report and continue safely
+COW-BUDGET pid=25 limit=143: report and continue safely
+COW-BUDGET pid=26 limit=143: report and continue safely
+COW-BUDGET pid=27 limit=143: report and continue safely
+COW-BUDGET pid=28 limit=143: report and continue safely
+COW-BUDGET pid=29 limit=143: report and continue safely
+COW-BUDGET pid=30 limit=143: report and continue safely
+COW-BUDGET pid=31 limit=143: report and continue safely
+COW-BUDGET pid=32 limit=143: report and continue safely
+COW-BUDGET pid=33 limit=143: report and continue safely
+COW-BUDGET pid=34 limit=143: report and continue safely
+COW-BUDGET pid=35 limit=143: report and continue safely
+COW-BUDGET pid=36 limit=143: report and continue safely
+COW-BUDGET pid=37 limit=143: report and continue safely
+COW-BUDGET pid=38 limit=143: report and continue safely
+COW-BUDGET pid=39 limit=143: report and continue safely
+COW-BUDGET pid=40 limit=143: report and continue safely
+COW-BUDGET pid=41 limit=143: report and continue safely
+COW-BUDGET pid=42 limit=143: report and continue safely
+COW-BUDGET pid=43 limit=143: report and continue safely
+COW-BUDGET pid=44 limit=143: report and continue safely
+COW-BUDGET pid=45 limit=143: report and continue safely
+LAB5 KILL PASS: 24 shared-writer exits
+COW-BUDGET pid=46 limit=143: report and continue safely
+LAB5 BUDGET PASS: >143 copies reported, data intact
+LAB5 ORPHAN PASS: parent exits first, init reaps shared pages
+LAB5 COWSTRESS PASS: pages=49 shared=0
+sh> cowoom
+LAB5 OOM ROLLBACK PASS: partial fork and exec cleanup
+LAB5 OOM FAULT PASS: no allocation, child killed, parent intact
+LAB5 COWOOM PASS: pages=48
+sh> bench
+RESULT avg_ctx_switch = 373
+PASS: bench
+sh> vmstress
+COW-BUDGET pid=69 limit=143: report and continue safely
+VMSTRESS PASS: 200 fork-exec cycles; pages=48
+sh> 

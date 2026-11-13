@@ -75,6 +75,8 @@ allocproc(void)
     p->chan = 0;
     p->tickets = 7 + COURSE_SID % 13;
     p->cpu_ticks = p->last_slice_ticks = 0;
+    p->cow_copies = 0;
+    p->cow_budget_reported = 0;
     p->name[0] = 0;
     for (int fd = 0; fd < 16; fd++) {
       p->pipes[fd] = 0;
@@ -98,30 +100,71 @@ allocproc(void)
 }
 
 static int
-load(struct proc *p, const char *name)
+load(struct proc *p, const char *name, char **argv, int argc)
 {
   for (struct uprog *program = _uprog_table; program->start;
        program = (struct uprog *)((program->end + 7) & ~7ULL)) {
     if (!streq(name, program->name)) continue;
-    uint64 image_size = program->end - program->start;
-    uint64 image_end = PGROUNDUP(PGSIZE + image_size);
+    uint64 length = program->end - program->start;
+    struct elf64_header *elf = (void *)program->start;
+    if (length < sizeof(*elf) || elf->magic != 0x464c457f ||
+        elf->ident[0] != 2 || elf->machine != 243 ||
+        elf->phentsize != sizeof(struct elf64_program) ||
+        elf->phoff > length || elf->phnum >
+          (length - elf->phoff) / sizeof(struct elf64_program)) return -1;
+    uint64 image_end = PGSIZE;
     uint64 guard_start = USER_STACK_BASE - LAB3_GUARD_PAGES * PGSIZE;
-    if (image_end >= guard_start) return -1;
     pagetable_t replacement = proc_pagetable(p);
     if (!replacement) return -1;
-    if (uvmalloc(replacement, PGSIZE, image_end, PTE_R | PTE_W | PTE_X) < 0 ||
-        uvmalloc(replacement, USER_STACK_BASE, USER_STACK_BASE + PGSIZE,
-                 PTE_R | PTE_W) < 0 ||
-        usercopy(replacement, PGSIZE, (void *)program->start, image_size, 1) < 0) {
-      proc_freepagetable(replacement);
-      return -1;
+    for (int i = 0; i < elf->phnum; i++) {
+      struct elf64_program *ph = (void *)(program->start + elf->phoff +
+                                         i * sizeof(*ph));
+      if (ph->type != 1 || !ph->memsz) continue;
+      if (ph->vaddr < PGSIZE || (ph->vaddr & (PGSIZE - 1)) ||
+          ph->vaddr >= guard_start || ph->memsz >= guard_start - ph->vaddr ||
+          ph->filesz > ph->memsz || ph->offset > length ||
+          ph->filesz > length - ph->offset ||
+          !(ph->flags & 4) || ((ph->flags & 3) == 3)) goto bad;
+      int flags = PTE_R;
+      if (ph->flags & 1) flags |= PTE_X;
+      if (ph->flags & 2) flags |= PTE_W;
+      if (uvmalloc(replacement, ph->vaddr, ph->vaddr + ph->memsz, flags) < 0 ||
+          uvmload(replacement, ph->vaddr,
+                  (void *)(program->start + ph->offset), ph->filesz) < 0)
+        goto bad;
+      if (PGROUNDUP(ph->vaddr + ph->memsz) > image_end)
+        image_end = PGROUNDUP(ph->vaddr + ph->memsz);
     }
+    if (elf->entry < PGSIZE || elf->entry >= image_end ||
+        uvmalloc(replacement, USER_STACK_BASE, USER_STACK_BASE + PGSIZE,
+                 PTE_R | PTE_W) < 0) goto bad;
+    uint64 sp = USER_STACK_BASE + PGSIZE;
+    uint64 uargv[LAB5_MAXARG + 1];
+    for (int i = 0; i < argc; i++) {
+      uint64 len = 0;
+      while (argv[i][len]) len++;
+      if (len + 1 > sp - USER_STACK_BASE) goto bad;
+      sp = (sp - len - 1) & ~15ULL;
+      if (sp < USER_STACK_BASE ||
+          usercopy(replacement, sp, argv[i], len + 1, 1) < 0) goto bad;
+      uargv[i] = sp;
+    }
+    uargv[argc] = 0;
+    uint64 bytes = (argc + 1) * sizeof(uint64);
+    if (bytes > sp - USER_STACK_BASE) goto bad;
+    sp = (sp - bytes) & ~15ULL;
+    if (sp < USER_STACK_BASE ||
+        usercopy(replacement, sp, uargv, bytes, 1) < 0) goto bad;
     pagetable_t old = p->pagetable;
     p->pagetable = replacement;
-    p->image_size = image_size;
+    p->image_size = image_end - PGSIZE;
     p->size = image_end;
-    p->trapframe->epc = PGSIZE;
-    p->trapframe->sp = USER_STACK_BASE + PGSIZE - 16;
+    p->trapframe->epc = elf->entry;
+    p->trapframe->sp = sp;
+    p->trapframe->a0 = argc;
+    p->trapframe->a1 = sp;
+    p->cow_copies = 0;
+    p->cow_budget_reported = 0;
     copy_name(p->name, program->name);
     if (LAB4_POLICY_ID == 5) {
       if (streq(p->name, "hi")) p->tickets = 1;
@@ -129,7 +172,11 @@ load(struct proc *p, const char *name)
       else if (streq(p->name, "sh")) p->tickets = 4;
     }
     proc_freepagetable(old);
-    return 0;
+    icache_fence();
+    return argc;
+bad:
+    proc_freepagetable(replacement);
+    return -1;
   }
   return -1;
 }
@@ -146,7 +193,8 @@ void
 userinit(void)
 {
   struct proc *p = allocproc();
-  if (!p || load(p, "sh") < 0) for (;;) asm volatile("wfi");
+  char *argv[] = {"init", 0};
+  if (!p || load(p, "init", argv, 1) < 0) for (;;) asm volatile("wfi");
   initproc = p;
   dump_pagetable(p->pagetable);
   acquire(&p->lock);
@@ -339,7 +387,10 @@ proc_fork(void)
   return child->pid;
 }
 
-int proc_exec(const char *name) { return load(current_proc, name); }
+int proc_exec(const char *name, char **argv, int argc)
+{
+  return load(current_proc, name, argv, argc);
+}
 
 uint64
 proc_sbrk(int amount)
@@ -426,7 +477,7 @@ proc_kill(int pid)
     struct proc *p = &procs[i];
     acquire(&p->lock);
     if (p->pid == pid && p->state != UNUSED && p->state != ZOMBIE) {
-      p->killed = 1;
+      __atomic_store_n(&p->killed, 1, __ATOMIC_RELEASE);
       if (p->state == SLEEPING) p->state = RUNNABLE;
       release_lock(&p->lock);
       return 0;

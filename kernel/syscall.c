@@ -72,21 +72,32 @@ static int
 sys_exec(void)
 {
   char name[32];
-  uint64 address = argraw(0);
-  if (address >= MAXVA || sizeof(name) > MAXVA - address)
-    return -1;
-  int index;
-  for (index = 0; index < sizeof(name) - 1; index++) {
-    if (usercopy(current_proc->pagetable, address + index,
-                 &name[index], 1, 0) < 0)
-      return -1;
-    if (name[index] == 0 || name[index] == '\n')
+  pagetable_t root = current_proc->pagetable;
+  if (userstring(root, argraw(0), name, sizeof(name)) < 0) return -1;
+  char *storage = kalloc();
+  if (!storage) return -1;
+  char *argv[LAB5_MAXARG + 1];
+  uint64 array = argraw(1), used = 0;
+  int argc = 0, result = -1;
+  for (;;) {
+    uint64 address;
+    if (!array || array >= MAXVA ||
+        (uint64)argc * sizeof(address) > MAXVA - array ||
+        usercopy(root, array + argc * sizeof(address), &address,
+                 sizeof(address), 0) < 0) break;
+    if (!address) {
+      argv[argc] = 0;
+      result = proc_exec(name, argv, argc);
       break;
+    }
+    if (argc == LAB5_MAXARG || used == PGSIZE) break;
+    int length = userstring(root, address, storage + used, PGSIZE - used);
+    if (length < 0) break;
+    argv[argc++] = storage + used;
+    used += length + 1;
   }
-  if (index == sizeof(name) - 1)
-    return -1;
-  name[index + 1] = 0;
-  return proc_exec(name);
+  kfree(storage);
+  return result;
 }
 
 void
@@ -112,6 +123,7 @@ syscall(void)
   case SYS_setickets: ret = proc_setickets((int)argraw(0)); break;
   case SYS_sbrk: ret = proc_sbrk((int)argraw(0)); break;
   case SYS_pagecount: ret = kpages_used(); break;
+  case SYS_pmc: ret = pmc_read((int)argraw(0)); break;
   default: ret = -1; break;
   }
   current_proc->trapframe->a0 = ret;

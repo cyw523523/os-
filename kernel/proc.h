@@ -2,6 +2,7 @@
 #define PROC_H
 
 #include "spinlock.h"
+#include "lab5.h"
 
 #define NPROC 16
 #define USER_MEM_SIZE KERNBASE
@@ -55,6 +56,8 @@ struct proc {
   int tickets;
   int cpu_ticks;
   int last_slice_ticks;
+  uint64 cow_copies;
+  int cow_budget_reported;
   char name[8];
   struct pipe *pipes[16];
   uchar fdmode[16];
@@ -79,7 +82,7 @@ int pipeclose(int fd);
 void pipefork(struct proc *parent, struct proc *child);
 void pipeexit(struct proc *p);
 int proc_fork(void);
-int proc_exec(const char *name);
+int proc_exec(const char *name, char **argv, int argc);
 int proc_wait(uint64 status_addr);
 void proc_exit(int status) __attribute__((noreturn));
 pagetable_t proc_pagetable(struct proc *p);
@@ -96,6 +99,10 @@ void uvmdealloc(pagetable_t root, uint64 start, uint64 end);
 int uvmcopy(pagetable_t source, pagetable_t target, uint64 start, uint64 end);
 int usercopy(pagetable_t root, uint64 va, void *buffer, uint64 count, int to_user);
 int usercheck(pagetable_t root, uint64 va, uint64 count, int write);
+int userstring(pagetable_t root, uint64 va, char *dst, uint64 limit);
+int uvmload(pagetable_t root, uint64 va, const void *src, uint64 count);
+uint64 pmc_read(int which);
+int cow_resolve(pagetable_t root, uint64 va);
 void dump_pagetable(pagetable_t root);
 uint64 proc_sbrk(int amount);
 
