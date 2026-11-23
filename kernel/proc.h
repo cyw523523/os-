@@ -4,7 +4,6 @@
 #include "spinlock.h"
 #include "lab5.h"
 
-#define NPROC 16
 #define USER_MEM_SIZE KERNBASE
 #define USER_STACK_BASE (USER_MEM_SIZE - 4 * PGSIZE)
 
@@ -37,7 +36,11 @@ extern struct cpu cpus[LAB4_NCPU];
 struct proc *myproc(void);
 #define current_proc myproc()
 
+#include "param.h"
+
 struct pipe;
+struct file;
+struct inode;
 
 struct proc {
   struct spinlock lock;
@@ -59,8 +62,10 @@ struct proc {
   uint64 cow_copies;
   int cow_budget_reported;
   char name[8];
-  struct pipe *pipes[16];
-  uchar fdmode[16];
+  struct pipe *pipes[NOFILE];
+  uchar fdmode[NOFILE];
+  struct file *files[NOFILE];
+  struct inode *cwd;
 };
 
 void procinit(void);

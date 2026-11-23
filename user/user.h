@@ -56,3 +56,7 @@ unsigned long time_rdtime(void);
 int setickets(int tickets);
 // lab5 计数观测(规范 §2.2 定稿):物理页复制计数
 unsigned long long pmc(int which);   // 0=累计复制次数,1=当前共享页数
+
+int crash_at(int stage);
+int crasharm(int stage);
+int fscachestat(void);

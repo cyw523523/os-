@@ -1,6 +1,8 @@
 #include "course_sid.h"
 #include "types.h"
 #include "riscv.h"
+#include "memlayout.h"
+#include "buf.h"
 
 void bannerputs(const char *);
 void bannerputc(int);
@@ -60,6 +62,7 @@ main(void)
     sfence_vma();
     w_stvec((uint64)kernelvec);
     consoleinithart();
+    *(volatile uint32 *)PLIC_SENABLE(r_tp()) |= 1U << VIRTIO0_IRQ;
     timerinit();
     scheduler();
   }
@@ -73,6 +76,9 @@ main(void)
   kinit();
   kvminit();
   procinit();
+  virtio_disk_init();
+  *(volatile uint32 *)(PLIC_PRIORITY + VIRTIO0_IRQ * 4) = 1;
+  *(volatile uint32 *)PLIC_SENABLE(0) |= 1U << VIRTIO0_IRQ;
   w_stvec((uint64)kernelvec);
   timerinit();
   userinit();

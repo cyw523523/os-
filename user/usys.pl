@@ -47,3 +47,7 @@ entry("schedstat");
 entry("time_rdtime");
 entry("setickets");
 entry("pmc");
+
+entry("crash_at");
+entry("crasharm");
+entry("fscachestat");

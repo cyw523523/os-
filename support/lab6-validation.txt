@@ -1,0 +1,43 @@
+Lab6 QEMU 验证记录
+学号 2024302111375
+环境 WSL、riscv64-unknown-elf-gcc、qemu-system-riscv64
+
+单核
+PASS fsstress，两轮并发读写与硬链接一致性
+PASS fscheck，两轮路径解析、直接块与间接块、共享文件偏移、删除打开文件和 EOF
+PASS Lab2 inject_uart，BUFSTORM lines=4 与 hi 由磁盘执行
+PASS Lab3 串口回归，页表、内存保护、内存计数和 VMSTRESS
+PASS Lab4 串口回归，bench、lottery_test、stride_test、VMSTRESS
+PASS Lab5 串口回归，EXEC、ARGV、COW、内存分配失败回滚和 VMSTRESS
+
+双核
+PASS fsstress 和 fscheck，各两轮
+PASS Lab4 SMPSTRESS，5 轮，每轮 6 个 worker、300 次 fork
+PASS Lab4 bench、lottery_test、VMSTRESS
+PASS Lab5 EXEC、ARGV、COW、内存分配失败回滚和 VMSTRESS
+
+fscheck 最后一轮缓存计数
+单核 hits=4635 evictions=159 writes=766 dirty_writebacks=291
+双核 hits=4325 evictions=159 writes=740 dirty_writebacks=282
+计数随调度和镜像初始状态变化。
+
+python3 support/check_lab6.py
+PASS c0 CREATED absent replay=0 second_boot=pass
+PASS c1 CREATED absent replay=0 second_boot=pass
+PASS c2 CREATED absent replay=0 second_boot=pass
+PASS c3 CREATED empty-file replay=1 second_boot=pass
+PASS c4 CREATED empty-file replay=1 second_boot=pass
+PASS c5 CREATED empty-file replay=0 second_boot=pass
+PASS c6 CREATED absent replay=0 second_boot=pass
+PASS c7 CREATED empty-file replay=1 second_boot=pass
+PASS w0 CONTENT OLD replay=0 second_boot=pass
+PASS w1 CONTENT OLD replay=0 second_boot=pass
+PASS w2 CONTENT OLD replay=0 second_boot=pass
+PASS w3 CONTENT NEW-V2 replay=1 second_boot=pass
+PASS w4 CONTENT NEW-V2 replay=1 second_boot=pass
+PASS w5 CONTENT NEW-V2 replay=0 second_boot=pass
+PASS w6 CONTENT OLD replay=0 second_boot=pass
+PASS w7 CONTENT NEW-V2 replay=1 second_boot=pass
+PASS o4 ORPHAN absent replay=1 second_boot=pass
+LAB6 CRASH MATRIX PASS (17 cases)
+自动化脚本将每个用例的完整串口输出写入 support/lab6-logs/。

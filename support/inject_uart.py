@@ -42,7 +42,7 @@ def main():
     qemu_args = QEMU_ARGS.copy()
     qemu_args[qemu_args.index("-smp") + 1] = str(args.cpus)
     if os.path.isfile(os.path.join(args.tree, "fs.img")):
-        qemu_args += ["-drive", "file=fs.img,if=none,format=raw,id=x0",
+        qemu_args += ["-drive", "file=fs.img,if=none,format=raw,id=x0,cache=directsync",
                       "-device", "virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0"]
     proc = subprocess.Popen([QEMU] + qemu_args, cwd=args.tree,
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,

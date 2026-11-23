@@ -4,6 +4,8 @@
 #include "course_sid.h"
 #include "proc.h"
 
+#include "buf.h"
+
 void syscall(void);
 void consoleintr(void);
 void printf(const char *, ...);
@@ -21,6 +23,7 @@ devintr(uint64 cause)
   if (cause == 0x8000000000000009ULL) {
     uint32 irq = *(volatile uint32 *)PLIC_SCLAIM(r_tp());
     if (irq == UART0_IRQ) consoleintr();
+    if (irq == VIRTIO0_IRQ) virtio_disk_intr();
     if (irq) *(volatile uint32 *)PLIC_SCLAIM(r_tp()) = irq;
     return 1;
   }

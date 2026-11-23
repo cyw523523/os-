@@ -1,0 +1,11 @@
+SEND fsstress
+EXPECT T1 PASS: concurrent rw \+ link/unlink consistent
+SEND fscheck
+EXPECT cache hits=[1-9][0-9]* evictions=[1-9][0-9]* writes=[1-9][0-9]* dirty_writebacks=[1-9][0-9]*
+EXPECT FSCHECK PASS
+SEND fsstress
+EXPECT T1 PASS: concurrent rw \+ link/unlink consistent
+SEND fscheck
+EXPECT FSCHECK PASS
+SEND hi
+EXPECT hi: user program running

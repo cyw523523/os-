@@ -253,6 +253,8 @@ kvminit(void)
       map2m(kernel_table, KERNBASE, KERNBASE, PHYSTOP - KERNBASE,
             PTE_R | PTE_W | PTE_X) < 0 ||
       map(kernel_table, UART0, UART0, PGSIZE, PTE_R | PTE_W) < 0 ||
+      map(kernel_table, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W) < 0 ||
+      map(kernel_table, 0x100000, 0x100000, PGSIZE, PTE_R | PTE_W) < 0 ||
       map(kernel_table, PLIC, PLIC, 0x400000, PTE_R | PTE_W) < 0 ||
       map(kernel_table, CLINT_BASE, CLINT_BASE, 0x10000, PTE_R | PTE_W) < 0 ||
       map(kernel_table, TRAMPOLINE, PGROUNDDOWN((uint64)trampoline),

@@ -21,7 +21,7 @@ pipealloc(uint64 user_fds)
   struct proc *p = current_proc;
   int fd0 = -1, fd1 = -1;
   for (int i = 3; i < 16; i++) {
-    if (!p->fdmode[i]) {
+    if (!p->fdmode[i] && !p->files[i]) {
       if (fd0 < 0) fd0 = i;
       else { fd1 = i; break; }
     }

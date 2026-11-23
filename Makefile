@@ -1,4 +1,6 @@
 # lab1 骨架 Makefile(课程提供;新增源文件时把它加进 OBJS)
+.DEFAULT_GOAL := all
+
 CC   = riscv64-unknown-elf-gcc
 LD   = riscv64-unknown-elf-ld
 CFLAGS = -Wall -Werror -O -std=gnu99 -mcmodel=medany -ffreestanding \
@@ -12,7 +14,7 @@ UPROGS += smpstress
 UPROGS += zerocopy cowpair
 UPROGS += argcheck exectest cowstress cowoom
 UPROGS += zeroraw
-UPROGS += init
+UPROGS += init fsstress fscheck fscrash fsverify
 UFLAGS = -Wall -Werror -O -std=gnu99 -mcmodel=medany -ffreestanding \
          -nostdlib -fno-common -ggdb -march=rv64gc \
          -fno-stack-protector -fno-pie -I. -DSID=2024302111375
@@ -20,7 +22,8 @@ UFLAGS = -Wall -Werror -O -std=gnu99 -mcmodel=medany -ffreestanding \
 OBJS = kernel/entry.o kernel/start.o kernel/console.o kernel/printf.o kernel/main.o \
        kernel/vm.o kernel/proc.o kernel/trap.o kernel/syscall.o \
        kernel/kernelvec.o kernel/trampoline.o kernel/swtch.o kernel/spinlock.o \
-       kernel/pipe.o kernel/userimg.o
+       kernel/pipe.o kernel/fsutil.o kernel/virtio_adapter.o kernel/crash_board.o \
+       kernel/bio.o kernel/log.o kernel/fs.o kernel/file.o
 LIBGCC = $(shell $(CC) -print-libgcc-file-name)
 
 kernel/kernel: $(OBJS) kernel/kernel.ld
@@ -74,17 +77,35 @@ user/noop.c: support/tests/noop.c
 user/vmstress.c: support/tests/vmstress.c
 	cp $< $@
 
-kernel/userimg.S: Makefile $(addprefix user-flat/,$(UPROGS:=.elf))
-	printf '.section .rodata\n .global _uprog_table\n_uprog_table:\n' > $@.tmp
-	for p in $(UPROGS); do \
-		printf ' .quad _uprog_%s_start\n .quad _uprog_%s_end\n .asciz "%s"\n .balign 8\n' $$p $$p $$p >> $@.tmp; \
-		printf ' .global _uprog_%s_start\n_uprog_%s_start:\n .incbin "user-flat/%s.elf"\n .global _uprog_%s_end\n_uprog_%s_end:\n .balign 8\n' $$p $$p $$p $$p $$p >> $@.tmp; \
-	done
-	printf ' .quad 0\n .quad 0\n' >> $@.tmp
-	mv $@.tmp $@
+LAB6_LOG_BLOCKS := $(shell awk '/^#define LAB6_LOG_BLOCKS / { print $$3 }' kernel/course_sid.h)
+HOSTCC = cc
+MKFS_SRC = gifts/lab6/gifts/mkfs/mkfs.c
+USER_ELFS = $(addprefix user-flat/,$(UPROGS:=.elf))
 
-kernel/userimg.o: kernel/userimg.S
-	$(CC) $(CFLAGS) -Ikernel -c -o $@ $<
+.PHONY: all fsimg qemu clean
+all: kernel/kernel fsimg
+
+mkfs/mkfs: $(MKFS_SRC) kernel/fs.h kernel/param.h kernel/types.h kernel/stat.h kernel/course_sid.h Makefile
+	mkdir -p mkfs
+	$(HOSTCC) -DLAB6_LOG_BLOCKS=$(LAB6_LOG_BLOCKS) -I. -o $@ $(MKFS_SRC)
+
+fs.img: mkfs/mkfs $(USER_ELFS) Makefile
+	mkdir -p user-flat/image
+	for p in $(UPROGS); do cp user-flat/$$p.elf user-flat/image/$$p; done
+	cd user-flat/image && ../../mkfs/mkfs ../../fs.img.new $(UPROGS)
+	mv fs.img.new fs.img
+
+fsimg: fs.img
+
+user/fsstress.c: gifts/lab6/support/tests/fsstress.c
+	cp $< $@
+
+kernel/virtio_adapter.o: gifts/lab6/gifts/kernel/virtio_disk.c
+# The SiFive test MMIO register accepts a 32-bit store on QEMU virt.
+kernel/crash_board.c: gifts/lab6/support/crash.c Makefile
+	sed 's/volatile uint64 \*)TEST_DEVICE_PA/volatile uint32 *)TEST_DEVICE_PA/' $< > $@
+
+kernel/crash_board.o: kernel/crash_board.c
 
 # The supplied linker script only collects .text.* while the supplied
 # trampoline uses an orphan section named trampsec. Rename it at build time
@@ -94,16 +115,18 @@ kernel/trampoline.o: kernel/trampoline.S
 	$(OBJCOPY) --rename-section trampsec=.text.trampoline,alloc,load,readonly,code,contents $@.tmp $@
 	rm -f $@.tmp
 
-%.o: %.c kernel/riscv.h kernel/course_sid.h kernel/proc.h kernel/lab5.h kernel/syscall.h
+%.o: %.c kernel/riscv.h kernel/course_sid.h kernel/proc.h kernel/lab5.h kernel/syscall.h $(wildcard kernel/*.h)
 	$(CC) $(CFLAGS) -Ikernel -c -o $@ $<
 
 %.o: %.S
 	$(CC) $(CFLAGS) -Ikernel -c -o $@ $<
 
-# 验收环境固定(排雷环节禁止改动本行以下内容)
-qemu: kernel/kernel
-	$(QEMU) -machine virt -bios none -kernel kernel/kernel -nographic
+CPUS ?= 1
+qemu: all
+	$(QEMU) -machine virt -bios none -kernel kernel/kernel -m 128M -smp $(CPUS) -nographic \
+	    -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0,cache=directsync \
+	    -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 clean:
-	rm -f kernel/*.o kernel/kernel user/usys.S kernel/userimg.S
+	rm -f kernel/*.o kernel/kernel user/usys.S user/fsstress.c kernel/crash_board.c mkfs/mkfs fs.img fs.img.new
 	rm -rf user-flat

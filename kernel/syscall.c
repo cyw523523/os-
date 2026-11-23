@@ -2,6 +2,10 @@
 #include "riscv.h"
 #include "syscall.h"
 #include "proc.h"
+#include "fsinternal.h"
+#include "buf.h"
+
+uint64 sys_crash_at(void);
 
 void consoleputc(int c);
 int consolegetc(void);
@@ -20,14 +24,29 @@ argraw(int n)
   }
 }
 
+int
+argint(int n, int *result)
+{
+  if (n < 0 || n > 2) return -1;
+  *result = argraw(n);
+  return 0;
+}
+
+static int
+getpath(int n, char path[MAXPATH])
+{
+  return userstring(current_proc->pagetable, argraw(n), path, MAXPATH);
+}
+
 static int
 sys_write(void)
 {
   uint64 va = argraw(1), n = argraw(2);
   int fd = (int)argraw(0);
-  if (fd >= 3) return pipewrite(fd, va, (int)n);
+  if (n > 65536) return -1;
+  if (fd >= 3) return fs_write(fd, va, (int)n);
   if (fd != 1 && fd != 2) return -1;
-  if (n > 65536 || usercheck(current_proc->pagetable, va, n, 0) < 0)
+  if (usercheck(current_proc->pagetable, va, n, 0) < 0)
     return -1;
   for (uint64 i = 0; i < n; i++) {
     char value;
@@ -43,9 +62,10 @@ sys_read(void)
 {
   uint64 va = argraw(1), n = argraw(2);
   int fd = (int)argraw(0);
-  if (fd >= 3) return piperead(fd, va, (int)n);
+  if (n > 65536) return -1;
+  if (fd >= 3) return fs_read(fd, va, (int)n);
   if (fd != 0) return -1;
-  if (n > 65536 || usercheck(current_proc->pagetable, va, n, 1) < 0)
+  if (usercheck(current_proc->pagetable, va, n, 1) < 0)
     return -1;
   for (uint64 i = 0; i < n; i++) {
     int c;
@@ -71,9 +91,13 @@ sys_read(void)
 static int
 sys_exec(void)
 {
-  char name[32];
+  char name[MAXPATH];
   pagetable_t root = current_proc->pagetable;
-  if (userstring(root, argraw(0), name, sizeof(name)) < 0) return -1;
+  int length = getpath(0, name);
+  if (length < 0) return -1;
+  // The Lab2 shell includes the line terminator in the exec name.
+  while (length && (name[length-1] == '\n' || name[length-1] == '\r'))
+    name[--length] = 0;
   char *storage = kalloc();
   if (!storage) return -1;
   char *argv[LAB5_MAXARG + 1];
@@ -100,6 +124,22 @@ sys_exec(void)
   return result;
 }
 
+static int
+sys_pathop(int number)
+{
+  char path[MAXPATH], destination[MAXPATH];
+  if (getpath(0, path) < 0) return -1;
+  switch (number) {
+  case SYS_open: return fs_open(path, (int)argraw(1));
+  case SYS_mkdir: return fs_mkdir(path);
+  case SYS_chdir: return fs_chdir(path);
+  case SYS_unlink: return fs_unlink(path);
+  case SYS_link:
+    if (getpath(1, destination) >= 0) return fs_link(path, destination);
+  }
+  return -1;
+}
+
 void
 syscall(void)
 {
@@ -113,7 +153,16 @@ syscall(void)
   case SYS_exec: ret = sys_exec(); break;
   case SYS_getpid: ret = current_proc->pid; break;
   case SYS_write: ret = sys_write(); break;
-  case SYS_close: ret = argraw(0) < 3 ? 0 : pipeclose((int)argraw(0)); break;
+  case SYS_close: ret = argraw(0) < 3 ? 0 : fs_close((int)argraw(0)); break;
+  case SYS_open: case SYS_mkdir: case SYS_chdir: case SYS_link: case SYS_unlink:
+    ret = sys_pathop(num);
+    break;
+  case SYS_fstat: ret = fs_fstat((int)argraw(0), argraw(1)); break;
+  case SYS_dup: ret = fs_dup((int)argraw(0)); break;
+  case SYS_sync: log_sync(); ret = 0; break;
+  case SYS_crash_at: ret = sys_crash_at(); break;
+  case SYS_crasharm: ret = log_arm_crash((int)argraw(0)); break;
+  case SYS_fscachestat: bstats(); ret = 0; break;
   case SYS_pipe: ret = pipealloc(argraw(0)); break;
   case SYS_kill: ret = proc_kill((int)argraw(0)); break;
   case SYS_pause: proc_pause((int)argraw(0)); ret = 0; break;
